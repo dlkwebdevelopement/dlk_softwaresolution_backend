@@ -17,11 +17,10 @@ module.exports = {
   production: {
     client: "mysql2",
     connection: {
-      host: "your_production_host",
-      user: "your_production_user",
+      host: "localhost",
+      user: "dlkuser",
       password: "Dlk@2026#Secure",
-      database: "your_production_database",
-      ssl: false, // change to true if using cloud DB
+      database: "dlksoftware_db",
     },
     pool: {
       min: 2,
