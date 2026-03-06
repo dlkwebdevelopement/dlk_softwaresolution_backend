@@ -15,6 +15,10 @@ app.use(
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:5175",
+      "https://dlksoftwaresolutions.co.in/admin",
+      "https://dlksoftwaresolutions.co.in",
+      "https://www.dlksoftwaresolutions.co.in",
+      " https://admin.dlksoftwaresolutions.co.in",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   }),
@@ -47,7 +51,7 @@ app.use((err, req, res, next) => {
 });
 
 // ✅ Start server
-const PORT = 5000;
+const PORT = 6000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port http://localhost:${PORT}`);
 });
