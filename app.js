@@ -18,7 +18,7 @@ app.use(
       "https://dlksoftwaresolutions.co.in/admin",
       "https://dlksoftwaresolutions.co.in",
       "https://www.dlksoftwaresolutions.co.in",
-      " https://admin.dlksoftwaresolutions.co.in",
+      "https://admin.dlksoftwaresolutions.co.in",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   }),
