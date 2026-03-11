@@ -1,14 +1,19 @@
-const { Model } = require("objection");
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
-class CourseWhoShouldEnroll extends Model {
-  static get tableName() {
-    return "course_who_should_enroll";
-  }
+const courseWhoShouldEnrollSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  course_id: { type: String, ref: "Course", required: true, index: true },
+  content: { type: String, required: true, trim: true },
+  order_index: { type: Number, default: 0 },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
-}
+courseWhoShouldEnrollSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-module.exports = CourseWhoShouldEnroll;
+module.exports = mongoose.model("CourseWhoShouldEnroll", courseWhoShouldEnrollSchema);

@@ -1,33 +1,25 @@
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-const { Model } = require("objection");
 
-class Banner extends Model {
-  static get tableName() {
-    return "banners";
-  }
+const { getFullUrl } = require("../../utils/urlHelper");
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
+const bannerSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  title: { type: String, required: true, trim: true },
+  highlight: { type: String, required: true, trim: true },
+  subtitle: { type: String, required: true, trim: true },
+  tagline: { type: String, trim: true },
+  description: { type: String, trim: true },
+  button: { type: String, trim: true },
+  photoUrl: { type: String, required: true, trim: true, get: getFullUrl },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true, getters: true },
+  toObject: { virtuals: true, getters: true }
+});
 
-  static get jsonSchema() {
-    return {
-      type: "object",
-      required: ["title", "highlight", "subtitle", "photoUrl"],
-      properties: {
-        id: { type: "string", format: "uuid" },
+bannerSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-        title: { type: "string" },
-        highlight: { type: "string" },
-        subtitle: { type: "string" },
-        tagline: { type: ["string", "null"] },
-        description: { type: ["string", "null"] },
-        button: { type: ["string", "null"] },
-
-        photoUrl: { type: "string" },
-      },
-    };
-  }
-}
-
-module.exports = Banner;
+module.exports = mongoose.model("Banner", bannerSchema);

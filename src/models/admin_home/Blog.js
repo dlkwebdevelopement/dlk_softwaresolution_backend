@@ -1,32 +1,23 @@
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-const { Model } = require("objection");
 
-class Blog extends Model {
-  static get tableName() {
-    return "blogs";
-  }
+const { getFullUrl } = require("../../utils/urlHelper");
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
+const blogSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  title: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true, trim: true },
+  short_description: { type: String, required: true, trim: true },
+  description: { type: String, required: true, trim: true },
+  image: { type: String, required: true, trim: true, get: getFullUrl },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true, getters: true },
+  toObject: { virtuals: true, getters: true }
+});
 
-  // Optional: JSON schema validation (recommended)
-  static get jsonSchema() {
-    return {
-      type: "object",
-      required: ["title", "slug", "short_description", "description", "image"],
+blogSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-      properties: {
-        id: { type: "integer" },
-        title: { type: "string", minLength: 1, maxLength: 255 },
-        slug: { type: "string", minLength: 1, maxLength: 255 },
-        short_description: { type: "string" },
-        description: { type: "string" },
-        image: { type: "string" },
-        created_at: { type: "string" },
-      },
-    };
-  }
-}
-
-module.exports = Blog;
+module.exports = mongoose.model("Blog", blogSchema);

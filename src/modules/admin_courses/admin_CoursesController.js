@@ -1,5 +1,11 @@
 const Course = require("../../models/admin_courses/Course");
+const CourseWhoShouldEnroll = require("../../models/admin_courses/CourseWhoShouldEnroll");
+const CourseLearningPoint = require("../../models/admin_courses/CourseLearningPoint");
+const CourseCurriculum = require("../../models/admin_courses/CourseCurriculum");
+const CourseReview = require("../../models/admin_courses/CourseReview");
 const slugify = require("slugify");
+const mongoose = require("mongoose");
+const { getFullUrl } = require("../../utils/urlHelper");
 
 // get by slug
 exports.getCourseBySlug = async (req, res) => {
@@ -7,67 +13,43 @@ exports.getCourseBySlug = async (req, res) => {
     const { slug } = req.params;
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const course = await Course.query()
-      .select(
-        "id",
-        "category_id",
-        "title",
-        "slug",
-        "short_description",
-        "full_description",
-        "thumbnail",
-        "syllabus_pdf",
-        "rating",
-        "total_ratings",
-        "total_students",
-        "mode",
-        "duration_months",
-        "level",
-        "price",
-        "original_price",
-        "discount_percentage",
-      )
-      .findOne({ slug })
-      .withGraphFetched(
-        `
-        [
-          whoShouldEnroll(orderByOrder),
-          learningPoints(orderByOrder),
-          curriculum(orderByOrder),
-          reviews(orderByCreated)
-        ]
-      `,
-      )
-      .modifiers({
-        orderByOrder(builder) {
-          builder.orderBy("order_index", "asc");
-        },
-        orderByCreated(builder) {
-          builder.orderBy("created_at", "desc");
-        },
+    const course = await Course.findOne({ slug })
+      .populate({
+        path: "category_id",
+        model: "Navbar"
       });
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    // Convert decimals
-    course.price = Number(course.price);
-    course.original_price = Number(course.original_price);
-    course.rating = Number(course.rating);
+    // Fetch related data manually as Mongoose doesn't do "graphs" as easily as Objection
+    const whoShouldEnroll = await CourseWhoShouldEnroll.find({ course_id: course._id }).sort({ order_index: 1 });
+    const learningPoints = await CourseLearningPoint.find({ course_id: course._id }).sort({ order_index: 1 });
+    const curriculum = await CourseCurriculum.find({ course_id: course._id }).sort({ order_index: 1 });
+    const reviews = await CourseReview.find({ course_id: course._id }).sort({ created_at: -1 });
 
-    // ✅ Add thumbnail_url
-    course.thumbnail_url = course.thumbnail
-      ? `${baseUrl}/uploads/${course.thumbnail}`
-      : null;
+    const courseObj = course.toObject();
+    courseObj.whoShouldEnroll = whoShouldEnroll;
+    courseObj.learningPoints = learningPoints;
+    courseObj.curriculum = curriculum;
+    courseObj.reviews = reviews;
 
-    course.syllabus_pdf_url = course.syllabus_pdf
-      ? `${baseUrl}/uploads/syllabus/${course.syllabus_pdf}`
+    // Convert decimals/numbers
+    courseObj.price = Number(courseObj.price);
+    courseObj.original_price = Number(courseObj.original_price);
+    courseObj.rating = Number(courseObj.rating);
+
+    // ✅ Add URLs
+    courseObj.thumbnail_url = getFullUrl(courseObj.thumbnail);
+
+    courseObj.syllabus_pdf_url = courseObj.syllabus_pdf
+      ? getFullUrl(`uploads/syllabus/${courseObj.syllabus_pdf}`)
       : null;
 
     return res.status(200).json({
       success: true,
-      data: course,
+      data: courseObj,
     });
   } catch (error) {
     console.error("Get Course Error:", error);
@@ -80,6 +62,8 @@ exports.getCourseBySlug = async (req, res) => {
 
 // create
 exports.createCourse = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { whoShouldEnroll, learningPoints, curriculum, ...courseData } =
       req.body;
@@ -94,7 +78,7 @@ exports.createCourse = async (req, res) => {
     // ✅ Generate slug using slugify
     let baseSlug = slugify(courseData.title, {
       lower: true,
-      strict: true, // removes special characters
+      strict: true,
       trim: true,
     });
 
@@ -102,7 +86,7 @@ exports.createCourse = async (req, res) => {
     let counter = 1;
 
     // Ensure slug uniqueness
-    while (await Course.query().findOne({ slug: finalSlug })) {
+    while (await Course.findOne({ slug: finalSlug })) {
       finalSlug = `${baseSlug}-${counter}`;
       counter++;
     }
@@ -111,25 +95,56 @@ exports.createCourse = async (req, res) => {
 
     // Save thumbnail if uploaded
     if (req.files?.thumbnail) {
-      courseData.thumbnail = req.files.thumbnail[0].filename;
+      courseData.thumbnail = getFullUrl(`uploads/${req.files.thumbnail[0].filename}`);
     }
 
     if (req.files?.syllabus_pdf) {
-      courseData.syllabus_pdf = req.files.syllabus_pdf[0].filename;
+      courseData.syllabus_pdf = getFullUrl(`uploads/syllabus/${req.files.syllabus_pdf[0].filename}`);
     }
 
-    const newCourse = await Course.query().insertGraph({
-      ...courseData,
-      whoShouldEnroll: whoShouldEnroll ? safeParse(whoShouldEnroll) : [],
-      learningPoints: safeParse(learningPoints),
-      curriculum: safeParse(curriculum),
-    });
+    // ✅ Parse numeric fields to prevent ValidationError from FormData string values
+    if (courseData.duration_months !== undefined) courseData.duration_months = parseFloat(courseData.duration_months) || undefined;
+    if (courseData.price !== undefined) courseData.price = parseFloat(courseData.price) || undefined;
+    if (courseData.original_price !== undefined) courseData.original_price = parseFloat(courseData.original_price) || undefined;
+    if (courseData.discount_percentage !== undefined) courseData.discount_percentage = parseFloat(courseData.discount_percentage) || undefined;
+    if (courseData.rating !== undefined) courseData.rating = parseFloat(courseData.rating) || 0;
+    if (courseData.total_ratings !== undefined) courseData.total_ratings = parseInt(courseData.total_ratings) || 0;
+    if (courseData.total_students !== undefined) courseData.total_students = parseInt(courseData.total_students) || 0;
+
+    const newCourse = await Course.create([courseData], { session });
+    const courseId = newCourse[0]._id;
+
+    if (whoShouldEnroll) {
+      const parsed = safeParse(whoShouldEnroll);
+      if (parsed.length > 0) {
+        await CourseWhoShouldEnroll.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+      }
+    }
+
+    if (learningPoints) {
+      const parsed = safeParse(learningPoints);
+      if (parsed.length > 0) {
+        await CourseLearningPoint.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+      }
+    }
+
+    if (curriculum) {
+      const parsed = safeParse(curriculum);
+      if (parsed.length > 0) {
+        await CourseCurriculum.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({
       success: true,
-      data: newCourse,
+      data: newCourse[0],
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Create Course Error:", error);
     return res.status(500).json({
       success: false,
@@ -140,23 +155,38 @@ exports.createCourse = async (req, res) => {
 
 // delete
 exports.deleteCourse = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { id } = req.params;
 
-    const deleted = await Course.query().deleteById(id);
+    const deleted = await Course.findByIdAndDelete(id, { session });
 
     if (!deleted) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: "Course not found",
       });
     }
 
+    // Delete related items
+    await CourseWhoShouldEnroll.deleteMany({ course_id: id }, { session });
+    await CourseLearningPoint.deleteMany({ course_id: id }, { session });
+    await CourseCurriculum.deleteMany({ course_id: id }, { session });
+    await CourseReview.deleteMany({ course_id: id }, { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
     return res.status(200).json({
       success: true,
       message: "Course deleted successfully",
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.error("Delete Course Error:", error);
     return res.status(500).json({
       success: false,
@@ -177,17 +207,19 @@ const safeParse = (data) => {
 
 // update
 exports.updateCourse = async (req, res) => {
-  const trx = await Course.knex().transaction();
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { id } = req.params;
 
     const { whoShouldEnroll, learningPoints, curriculum, ...courseData } =
       req.body;
 
-    const course = await Course.query(trx).findById(id);
+    const course = await Course.findById(id).session(session);
 
     if (!course) {
-      await trx.rollback();
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({
         success: false,
         message: "Course not found",
@@ -206,10 +238,7 @@ exports.updateCourse = async (req, res) => {
       let counter = 1;
 
       while (
-        await Course.query(trx)
-          .where("slug", finalSlug)
-          .whereNot("id", id)
-          .first()
+        await Course.findOne({ slug: finalSlug, _id: { $ne: id } }).session(session)
       ) {
         finalSlug = `${baseSlug}-${counter}`;
         counter++;
@@ -219,18 +248,24 @@ exports.updateCourse = async (req, res) => {
     }
 
     if (req.files?.thumbnail?.length > 0) {
-      courseData.thumbnail = req.files.thumbnail[0].filename;
+      courseData.thumbnail = getFullUrl(`uploads/${req.files.thumbnail[0].filename}`);
     }
 
     if (req.files?.syllabus_pdf?.length > 0) {
-      courseData.syllabus_pdf = req.files.syllabus_pdf[0].filename;
+      courseData.syllabus_pdf = getFullUrl(`uploads/syllabus/${req.files.syllabus_pdf[0].filename}`);
     }
 
+    // ✅ Parse numeric fields to prevent ValidationError from FormData string values
+    if (courseData.duration_months !== undefined) courseData.duration_months = parseFloat(courseData.duration_months) || undefined;
+    if (courseData.price !== undefined) courseData.price = parseFloat(courseData.price) || undefined;
+    if (courseData.original_price !== undefined) courseData.original_price = parseFloat(courseData.original_price) || undefined;
+    if (courseData.discount_percentage !== undefined) courseData.discount_percentage = parseFloat(courseData.discount_percentage) || undefined;
+    if (courseData.rating !== undefined) courseData.rating = parseFloat(courseData.rating) || 0;
+    if (courseData.total_ratings !== undefined) courseData.total_ratings = parseInt(courseData.total_ratings) || 0;
+    if (courseData.total_students !== undefined) courseData.total_students = parseInt(courseData.total_students) || 0;
+
     if (Object.keys(courseData).length > 0) {
-      await Course.query(trx).patchAndFetchById(id, {
-        ...courseData,
-        updated_at: new Date(),
-      });
+      await Course.findByIdAndUpdate(id, courseData, { session });
     }
 
     const parsedWhoShouldEnroll =
@@ -245,40 +280,36 @@ exports.updateCourse = async (req, res) => {
       typeof curriculum !== "undefined" ? safeParse(curriculum) : null;
 
     if (parsedWhoShouldEnroll !== null) {
-      await course.$relatedQuery("whoShouldEnroll", trx).delete();
+      await CourseWhoShouldEnroll.deleteMany({ course_id: id }, { session });
       if (parsedWhoShouldEnroll.length > 0) {
-        for (const item of parsedWhoShouldEnroll) {
-          await course.$relatedQuery("whoShouldEnroll", trx).insert(item);
-        }
+        await CourseWhoShouldEnroll.create(parsedWhoShouldEnroll.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
     if (parsedLearningPoints !== null) {
-      await course.$relatedQuery("learningPoints", trx).delete();
+      await CourseLearningPoint.deleteMany({ course_id: id }, { session });
       if (parsedLearningPoints.length > 0) {
-        for (const item of parsedLearningPoints) {
-          await course.$relatedQuery("learningPoints", trx).insert(item);
-        }
+        await CourseLearningPoint.create(parsedLearningPoints.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
     if (parsedCurriculum !== null) {
-      await course.$relatedQuery("curriculum", trx).delete();
+      await CourseCurriculum.deleteMany({ course_id: id }, { session });
       if (parsedCurriculum.length > 0) {
-        for (const item of parsedCurriculum) {
-          await course.$relatedQuery("curriculum", trx).insert(item);
-        }
+        await CourseCurriculum.create(parsedCurriculum.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
-    await trx.commit();
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(200).json({
       success: true,
       message: "Course updated successfully",
     });
   } catch (error) {
-    await trx.rollback();
+    await session.abortTransaction();
+    session.endSession();
     console.error("Update Course Error:", error);
     return res.status(500).json({
       success: false,
@@ -298,45 +329,25 @@ exports.getAllCourses = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    const coursesQuery = Course.query()
-      .select(
-        "id",
-        "category_id",
-        "title",
-        "slug",
-        "thumbnail",
-        "syllabus_pdf",
-        "rating",
-        "total_ratings",
-        "total_students",
-        "mode",
-        "duration_months",
-        "level",
-        "price",
-        "original_price",
-        "discount_percentage",
-        "created_at",
-      )
-      .orderBy("created_at", "desc");
-
-    const total = await coursesQuery.resultSize();
-
-    const courses = await coursesQuery.limit(limit).offset(offset);
+    const total = await Course.countDocuments();
+    const courses = await Course.find()
+      .sort({ created_at: -1 })
+      .skip(offset)
+      .limit(limit);
 
     // Convert decimal fields to numbers
-    const formattedCourses = courses.map((course) => ({
-      ...course,
-      price: Number(course.price),
-      original_price: Number(course.original_price),
-      rating: Number(course.rating),
-      thumbnail_url: course.thumbnail
-        ? `${baseUrl}/uploads/${course.thumbnail}`
-        : null,
-
-      syllabus_pdf_url: course.syllabus_pdf
-        ? `${baseUrl}/uploads/syllabus/${course.syllabus_pdf}`
-        : null,
-    }));
+    const formattedCourses = courses.map((course) => {
+      const c = course.toObject();
+      return {
+        ...c,
+        id: c._id,
+        price: Number(c.price),
+        original_price: Number(c.original_price),
+        rating: Number(c.rating),
+        thumbnail_url: getFullUrl(c.thumbnail),
+        syllabus_pdf_url: getFullUrl(c.syllabus_pdf ? `uploads/syllabus/${c.syllabus_pdf}` : null),
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -362,22 +373,21 @@ exports.getCoursesByCategory = async (req, res) => {
     const { categoryId } = req.params;
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const courses = await Course.query()
-      .where("category_id", categoryId)
-      .orderBy("created_at", "desc");
+    const courses = await Course.find({ category_id: categoryId })
+      .sort({ created_at: -1 });
 
-    const formattedCourses = courses.map((course) => ({
-      ...course,
-      price: Number(course.price),
-      original_price: Number(course.original_price),
-      rating: Number(course.rating),
-      thumbnail_url: course.thumbnail
-        ? `${baseUrl}/uploads/${course.thumbnail}`
-        : null,
-      syllabus_pdf_url: course.syllabus_pdf
-        ? `${baseUrl}/uploads/syllabus/${course.syllabus_pdf}`
-        : null,
-    }));
+    const formattedCourses = courses.map((course) => {
+      const c = course.toObject();
+      return {
+        ...c,
+        id: c._id,
+        price: Number(c.price),
+        original_price: Number(c.original_price),
+        rating: Number(c.rating),
+        thumbnail_url: getFullUrl(c.thumbnail),
+        syllabus_pdf_url: getFullUrl(c.syllabus_pdf ? `uploads/syllabus/${c.syllabus_pdf}` : null),
+      };
+    });
 
     return res.status(200).json({
       success: true,

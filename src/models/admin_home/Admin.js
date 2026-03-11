@@ -1,26 +1,19 @@
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-const {Model} = require("objection");
 
-class Admin extends Model {
-  static get tableName() {
-    return "admins";
-  }
+const adminSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  username: { type: String, required: true, unique: true, trim: true, lowercase: true },
+  password: { type: String, required: true },
+  email: { type: String, trim: true, lowercase: true },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
+adminSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-  static get jsonSchema() {
-    return {
-      type: "object",
-      required: ["username", "password"],
-      properties: {
-        id: { type: "string" },
-        email: { type: "string" },
-        password: { type: "string" },
-      },
-    };
-  }
-}
-
-module.exports = Admin;
+module.exports = mongoose.model("Admin", adminSchema);

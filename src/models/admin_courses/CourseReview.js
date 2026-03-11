@@ -1,14 +1,23 @@
-const { Model } = require("objection");
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
-class CourseReview extends Model {
-  static get tableName() {
-    return "course_reviews";
-  }
+const courseReviewSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  course_id: { type: String, ref: "Course", required: true, index: true },
+  student_name: { type: String, required: true, trim: true },
+  student_avatar: { type: String, trim: true },
+  rating: { type: Number, required: true },
+  review: { type: String, trim: true },
+  helpful_yes: { type: Number, default: 0 },
+  helpful_no: { type: Number, default: 0 },
+}, { 
+  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
-}
+courseReviewSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-module.exports = CourseReview;
+module.exports = mongoose.model("CourseReview", courseReviewSchema);

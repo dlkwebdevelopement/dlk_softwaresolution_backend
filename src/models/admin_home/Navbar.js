@@ -1,15 +1,21 @@
-const { Model } = require("objection");
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
+const { getFullUrl } = require("../../utils/urlHelper");
 
-class Navbar extends Model {
-  static get tableName() {
-    return "navbar";
-  }
+const navbarSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  category: { type: String, required: true, trim: true, index: true },
+  image: { type: String, trim: true, get: getFullUrl },
+  description: { type: String, trim: true },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true, getters: true },
+  toObject: { virtuals: true, getters: true }
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
-}
+navbarSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-module.exports = Navbar;
+module.exports = mongoose.model("Navbar", navbarSchema);

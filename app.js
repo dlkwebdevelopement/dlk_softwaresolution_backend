@@ -2,9 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const path = require("path");
-const { Model } = require("objection");
-const knex = require("./src/db/config");
-Model.knex(knex);
+const mongoose = require("mongoose");
+require("dotenv").config();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.log("❌ MongoDB Connection Error:", err));
 
 const app = express();
 
@@ -51,7 +55,7 @@ app.use((err, req, res, next) => {
 });
 
 // ✅ Start server
-const PORT = 6000;
+const PORT = process.env.NODE_ENV === "production" ? 6000 : 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port http://localhost:${PORT}`);
 });

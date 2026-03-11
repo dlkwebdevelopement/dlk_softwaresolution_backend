@@ -1,25 +1,19 @@
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-const { Model } = require("objection");
 
-class Company extends Model {
-  static get tableName() {
-    return "companies";
-  }
+const { getFullUrl } = require("../../utils/urlHelper");
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
+const companySchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  photoUrl: { type: String, required: true, trim: true, get: getFullUrl },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true, getters: true },
+  toObject: { virtuals: true, getters: true }
+});
 
-  static get jsonSchema() {
-    return {
-      type: "object",
-      required: ["photoUrl"],
-      properties: {
-        id: { type: "string" },
-        photoUrl: { type: "string" },
-      },
-    };
-  }
-}
+companySchema.virtual("id").get(function() {
+  return this._id;
+});
 
-module.exports = Company;
+module.exports = mongoose.model("Company", companySchema);

@@ -1,30 +1,18 @@
-const { Model } = require("objection");
-
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
-const Navbar = require("./Navbar");
+const subcategorySchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  subcategory: { type: String, required: true, trim: true },
+  category_id: { type: String, ref: "Navbar", required: true, index: true },
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-class Subcategory extends Model {
-  static get tableName() {
-    return "subcategories";
-  }
+subcategorySchema.virtual("id").get(function() {
+  return this._id;
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
-
-  static get relationMappings() {
-    return {
-      category: {
-        relation: Model.BelongsToOneRelation,
-        modelClass: Navbar,
-        join: {
-          from: "subcategories.category_id",
-          to: "navbar.id",
-        },
-      },
-    };
-  }
-}
-
-module.exports = Subcategory;
+module.exports = mongoose.model("Subcategory", subcategorySchema);

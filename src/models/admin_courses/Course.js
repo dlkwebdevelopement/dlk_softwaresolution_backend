@@ -1,59 +1,34 @@
-const { Model } = require("objection");
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
-class Course extends Model {
-  static get tableName() {
-    return "course";
-  }
+const { getFullUrl } = require("../../utils/urlHelper");
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
+const courseSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  category_id: { type: String, ref: "Navbar", required: true, index: true },
+  title: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true, trim: true },
+  short_description: { type: String, trim: true },
+  full_description: { type: String, trim: true },
+  thumbnail: { type: String, trim: true, get: getFullUrl },
+  rating: { type: Number, default: 0 },
+  total_ratings: { type: Number, default: 0 },
+  total_students: { type: Number, default: 0 },
+  mode: { type: String, trim: true },
+  duration_months: { type: Number },
+  level: { type: String, trim: true },
+  price: { type: Number },
+  original_price: { type: Number },
+  discount_percentage: { type: Number },
+  syllabus_pdf: { type: String, trim: true },
+}, { 
+  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  toJSON: { virtuals: true, getters: true },
+  toObject: { virtuals: true, getters: true }
+});
 
-  static get relationMappings() {
-    const CourseWhoShouldEnroll = require("./CourseWhoShouldEnroll");
-    const CourseLearningPoint = require("./CourseLearningPoint");
-    const CourseCurriculum = require("./CourseCurriculum");
-    const CourseReview = require("./CourseReview");
+courseSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-    return {
-      whoShouldEnroll: {
-        relation: Model.HasManyRelation,
-        modelClass: CourseWhoShouldEnroll,
-        join: {
-          from: "course.id",
-          to: "course_who_should_enroll.course_id",
-        },
-      },
-
-      learningPoints: {
-        relation: Model.HasManyRelation,
-        modelClass: CourseLearningPoint,
-        join: {
-          from: "course.id",
-          to: "course_learning_points.course_id",
-        },
-      },
-
-      curriculum: {
-        relation: Model.HasManyRelation,
-        modelClass: CourseCurriculum,
-        join: {
-          from: "course.id",
-          to: "course_curriculum.course_id",
-        },
-      },
-
-      reviews: {
-        relation: Model.HasManyRelation,
-        modelClass: CourseReview,
-        join: {
-          from: "course.id",
-          to: "course_reviews.course_id",
-        },
-      },
-    };
-  }
-}
-
-module.exports = Course;
+module.exports = mongoose.model("Course", courseSchema);

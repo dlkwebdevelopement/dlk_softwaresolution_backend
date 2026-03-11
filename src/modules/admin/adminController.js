@@ -16,13 +16,15 @@ const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
 const transporter = require("../../utils/mailsender");
+const mongoose = require("mongoose");
+const { getFullUrl } = require("../../utils/urlHelper");
 
 // ✅ Admin login
 exports.adminLogin = async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const admin = await Admin.query().findOne({ username, password });
+    const admin = await Admin.findOne({ username, password });
     if (!admin) return res.status(401).json({ message: "Invalid credentials" });
     res.status(200).json({ message: "Login successful", admin });
   } catch (err) {
@@ -43,10 +45,10 @@ exports.createCategory = async (req, res) => {
       return res.status(400).json({ message: "Category is required" });
     }
 
-    const data = await Navbar.query().insert({
+    const data = await Navbar.create({
       category,
       description: description || null,
-      image: req.file ? `uploads/${req.file.filename}` : null,
+      image: req.file ? getFullUrl(`uploads/${req.file.filename}`) : null,
     });
 
     res.status(201).json({
@@ -64,23 +66,22 @@ exports.createCategory = async (req, res) => {
 ========================= */
 exports.getCategories = async (req, res) => {
   try {
-    const data = await Navbar.query().select("*");
+    const data = await Navbar.find();
     res.status(200).json(data);
   } catch (err) {
     console.error("GET ALL CATEGORIES ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };
-
 /* =========================
    UPDATE NAVBAR ITEM
-========================= */
+ ========================= */
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
     const { category, description } = req.body;
 
-    const existing = await Navbar.query().findById(id);
+    const existing = await Navbar.findById(id);
 
     if (!existing) {
       return res.status(404).json({ message: "Category not found" });
@@ -92,14 +93,14 @@ exports.updateCategory = async (req, res) => {
         const oldPath = path.join("uploads", path.basename(existing.image));
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
       }
-      image = `uploads/${req.file.filename}`;
+      image = getFullUrl(`uploads/${req.file.filename}`);
     }
 
-    const updated = await Navbar.query().patchAndFetchById(id, {
+    const updated = await Navbar.findByIdAndUpdate(id, {
       category: category ?? existing.category,
       description: description ?? existing.description,
       image,
-    });
+    }, { new: true });
 
     res.status(200).json({
       message: "Category updated successfully",
@@ -111,6 +112,7 @@ exports.updateCategory = async (req, res) => {
   }
 };
 
+
 /* =========================
    DELETE NAVBAR ITEM
 ========================= */
@@ -118,7 +120,7 @@ exports.deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = await Navbar.query().findById(id);
+    const existing = await Navbar.findById(id);
 
     if (!existing) {
       return res.status(404).json({ message: "Category not found" });
@@ -130,7 +132,7 @@ exports.deleteCategory = async (req, res) => {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    await Navbar.query().deleteById(id);
+    await Navbar.findByIdAndDelete(id);
 
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (err) {
@@ -142,7 +144,7 @@ exports.deleteCategory = async (req, res) => {
 // ✅ Create subcategory
 exports.createSubcategory = async (req, res) => {
   try {
-    const subcategory = await Subcategory.query().insert({
+    const subcategory = await Subcategory.create({
       category_id: req.body.category_id,
       subcategory: req.body.subcategory,
     });
@@ -155,8 +157,7 @@ exports.createSubcategory = async (req, res) => {
 // ✅ Get all subcategories
 exports.getSubcategories = async (req, res) => {
   try {
-    const subcategories =
-      await Subcategory.query().withGraphFetched("category");
+    const subcategories = await Subcategory.find().populate("category_id");
     res.json(subcategories);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -169,10 +170,10 @@ exports.updateSubcategory = async (req, res) => {
     const { id } = req.params;
     const { subcategory, category_id } = req.body;
 
-    const updated = await Subcategory.query().patchAndFetchById(id, {
+    const updated = await Subcategory.findByIdAndUpdate(id, {
       subcategory,
       category_id,
-    });
+    }, { new: true });
 
     if (!updated)
       return res.status(404).json({ message: "Subcategory not found" });
@@ -186,7 +187,7 @@ exports.updateSubcategory = async (req, res) => {
 exports.deleteSubcategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Subcategory.query().deleteById(id);
+    const deleted = await Subcategory.findByIdAndDelete(id);
 
     if (!deleted)
       return res.status(404).json({ message: "Subcategory not found" });
@@ -202,16 +203,21 @@ exports.deleteSubcategory = async (req, res) => {
 exports.getCategoriesWithSubs = async (req, res) => {
   try {
     // Fetch all categories
-    const categories = await Navbar.query().select("*");
+    const categories = await Navbar.find();
 
-    // Fetch all subcategories with category info
-    const subcategories = await Subcategory.query().select("*");
+    // Fetch all subcategories
+    const subcategories = await Subcategory.find();
 
     // Nest subcategories under their categories
-    const result = categories.map((cat) => ({
-      ...cat,
-      subcategories: subcategories.filter((sub) => sub.category_id === cat.id),
-    }));
+    const result = categories.map((cat) => {
+      const c = cat.toObject();
+      return {
+        ...c,
+        subcategories: subcategories
+          .filter((sub) => String(sub.category_id) === String(cat._id))
+          .map((sub) => sub.toObject()),
+      };
+    });
 
     res.status(200).json(result);
   } catch (err) {
@@ -223,7 +229,7 @@ exports.getCategoriesWithSubs = async (req, res) => {
 // ✅ Get enquiries
 exports.getEnquiries = async (req, res) => {
   try {
-    const data = await Enquiry.query();
+    const data = await Enquiry.find();
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -240,7 +246,7 @@ exports.createEnquiry = async (req, res) => {
     }
 
     // 1️⃣ Save to DB
-    const newEnquiry = await Enquiry.query().insert({
+    const newEnquiry = await Enquiry.create({
       name,
       email,
       mobile,
@@ -330,21 +336,21 @@ exports.uploadBanner = async (req, res) => {
     const { title, highlight, subtitle, tagline, description, button } =
       req.body;
 
-    // ✅ Basic validation (prevents MySQL crash)
+    // ✅ Basic validation
     if (!title || !highlight || !subtitle) {
       return res.status(400).json({
         message: "Title, highlight, and subtitle are required",
       });
     }
 
-    const banner = await Banner.query().insert({
+    const banner = await Banner.create({
       title,
       highlight,
       subtitle,
       tagline: tagline || null,
       description: description || null,
       button: button || null,
-      photoUrl: `uploads/${req.file.filename}`, // ✅ safest path
+      photoUrl: getFullUrl(`uploads/${req.file.filename}`),
     });
 
     res.status(201).json({
@@ -360,7 +366,7 @@ exports.uploadBanner = async (req, res) => {
 // ✅ Get all banners
 exports.getBanners = async (req, res) => {
   try {
-    const banners = await Banner.query();
+    const banners = await Banner.find();
     res.status(200).json(banners || []);
   } catch (err) {
     console.error("Error fetching banners:", err);
@@ -374,7 +380,7 @@ exports.deleteBanner = async (req, res) => {
     const { id } = req.params;
 
     // 1️⃣ Find the banner record
-    const banner = await Banner.query().findById(id);
+    const banner = await Banner.findById(id);
     if (!banner) {
       return res.status(404).json({ message: "Banner not found" });
     }
@@ -391,7 +397,7 @@ exports.deleteBanner = async (req, res) => {
     }
 
     // 3️⃣ Delete the record from DB
-    await Banner.query().deleteById(id);
+    await Banner.findByIdAndDelete(id);
 
     res.json({ message: "Banner deleted successfully" });
   } catch (err) {
@@ -403,7 +409,7 @@ exports.deleteBanner = async (req, res) => {
 // ✅ Upload company photo
 exports.uploadCompany = async (req, res) => {
   try {
-    const company = await Company.query().insert({ photoUrl: req.file.path });
+    const company = await Company.create({ photoUrl: getFullUrl(req.file.path) });
     res.json({ message: "Company photo uploaded", company });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -413,7 +419,7 @@ exports.uploadCompany = async (req, res) => {
 // ✅ Get all company photos
 exports.getCompanies = async (req, res) => {
   try {
-    const companies = await Company.query();
+    const companies = await Company.find();
     res.json(companies);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -426,7 +432,7 @@ exports.deleteCompany = async (req, res) => {
     const { id } = req.params;
 
     // 1️⃣ Find the company record
-    const company = await Company.query().findById(id);
+    const company = await Company.findById(id);
     if (!company) {
       return res.status(404).json({ message: "Company not found" });
     }
@@ -443,7 +449,7 @@ exports.deleteCompany = async (req, res) => {
     }
 
     // 3️⃣ Delete from DB
-    await Company.query().deleteById(id);
+    await Company.findByIdAndDelete(id);
 
     res.json({ message: "Company deleted successfully" });
   } catch (err) {
@@ -460,7 +466,7 @@ exports.addQuestion = async (req, res) => {
       return res.status(400).json({ message: "Question is required" });
     }
 
-    const newQuestion = await Question.query().insert({ question });
+    const newQuestion = await Question.create({ question });
     res.status(201).json({
       message: "Question added successfully",
       question: newQuestion,
@@ -481,12 +487,12 @@ exports.addAnswer = async (req, res) => {
         .json({ message: "Both answer and question_id are required" });
     }
 
-    const question = await Question.query().findById(question_id);
+    const question = await Question.findById(question_id);
     if (!question) {
       return res.status(404).json({ message: "Question not found" });
     }
 
-    const newAnswer = await Answer.query().insert({ answer, question_id });
+    const newAnswer = await Answer.create({ answer, question_id });
     res.status(201).json({
       message: "Answer added successfully",
       answer: newAnswer,
@@ -500,7 +506,7 @@ exports.addAnswer = async (req, res) => {
 // ✅ Get all questions (with answers)
 exports.getAllQuestions = async (req, res) => {
   try {
-    const questions = await Question.query().withGraphFetched("answers");
+    const questions = await Question.find().populate("answers");
     res.status(200).json(questions);
   } catch (error) {
     console.error("Error fetching questions:", error);
@@ -514,9 +520,9 @@ exports.updateQuestion = async (req, res) => {
     const { id } = req.params;
     const { question } = req.body;
 
-    const updatedQuestion = await Question.query().patchAndFetchById(id, {
+    const updatedQuestion = await Question.findByIdAndUpdate(id, {
       question,
-    });
+    }, { new: true });
 
     if (!updatedQuestion) {
       return res.status(404).json({ message: "Question not found" });
@@ -536,7 +542,7 @@ exports.updateQuestion = async (req, res) => {
 exports.deleteQuestion = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Question.query().deleteById(id);
+    const deleted = await Question.findByIdAndDelete(id);
 
     if (!deleted) {
       return res.status(404).json({ message: "Question not found" });
@@ -555,9 +561,9 @@ exports.updateAnswer = async (req, res) => {
     const { id } = req.params;
     const { answer } = req.body;
 
-    const updatedAnswer = await Answer.query().patchAndFetchById(id, {
+    const updatedAnswer = await Answer.findByIdAndUpdate(id, {
       answer,
-    });
+    }, { new: true });
 
     if (!updatedAnswer) {
       return res.status(404).json({ message: "Answer not found" });
@@ -577,7 +583,7 @@ exports.updateAnswer = async (req, res) => {
 exports.deleteAnswer = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Answer.query().deleteById(id);
+    const deleted = await Answer.findByIdAndDelete(id);
 
     if (!deleted) {
       return res.status(404).json({ message: "Answer not found" });
@@ -598,7 +604,7 @@ exports.createHiring = async (req, res) => {
       return res.status(400).json({ message: "Company name is required" });
     }
 
-    const newHiring = await HiringComps.query().insert({ companies });
+    const newHiring = await HiringComps.create({ companies });
     res
       .status(201)
       .json({ message: "Company name created", hiring: newHiring });
@@ -610,7 +616,7 @@ exports.createHiring = async (req, res) => {
 // ✅ Get all hiring companies
 exports.getAllHiring = async (req, res) => {
   try {
-    const hiringList = await HiringComps.query();
+    const hiringList = await HiringComps.find();
     res.status(200).json(hiringList);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -623,9 +629,10 @@ exports.updateHiring = async (req, res) => {
     const { id } = req.params;
     const { companies } = req.body;
 
-    const updated = await HiringComps.query().patchAndFetchById(id, {
+    const updated = await HiringComps.findByIdAndUpdate(id, {
       companies,
-    });
+    }, { new: true });
+
     if (!updated) {
       return res.status(404).json({ message: "Company not found" });
     }
@@ -640,7 +647,7 @@ exports.updateHiring = async (req, res) => {
 exports.deleteHiring = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await HiringComps.query().deleteById(id);
+    const deleted = await HiringComps.findByIdAndDelete(id);
 
     if (!deleted) {
       return res.status(404).json({ message: "Company not found" });
@@ -667,12 +674,12 @@ exports.createRegistration = async (req, res) => {
     }
 
     // Check if courseId exists
-    const course = await Navbar.query().findById(courseId);
+    const course = await Navbar.findById(courseId);
     if (!course) {
       return res.status(404).json({ message: "Selected course not found" });
     }
 
-    const registration = await Registration.query().insert({
+    const registration = await Registration.create({
       fullName,
       email,
       phone,
@@ -695,17 +702,20 @@ exports.createRegistration = async (req, res) => {
  */
 exports.getRegistrations = async (req, res) => {
   try {
-    const registrations = await Registration.query().withGraphFetched("course");
+    const registrations = await Registration.find().populate("courseId");
 
     // Format response
-    const formatted = registrations.map((r) => ({
-      id: r.id,
-      fullName: r.fullName,
-      email: r.email,
-      phone: r.phone,
-      courseId: r.courseId,
-      courseName: r.course?.category,
-    }));
+    const formatted = registrations.map((r) => {
+      const robj = r.toObject();
+      return {
+        id: robj._id,
+        fullName: robj.fullName,
+        email: robj.email,
+        phone: robj.phone,
+        courseId: robj.courseId?._id || robj.courseId,
+        courseName: robj.courseId?.category,
+      };
+    });
 
     return res.json(formatted);
   } catch (error) {
@@ -743,7 +753,7 @@ exports.createLiveClass = async (req, res) => {
       });
     }
 
-    const liveClass = await LiveClass.query().insert({
+    const liveClass = await LiveClass.create({
       courseId,
       title,
       startDate,
@@ -766,9 +776,9 @@ exports.createLiveClass = async (req, res) => {
  */
 exports.getAllLiveClasses = async (req, res) => {
   try {
-    const liveClasses = await LiveClass.query()
-      .withGraphFetched("category")
-      .orderBy("createdAt", "desc");
+    const liveClasses = await LiveClass.find()
+      .populate("courseId")
+      .sort({ createdAt: -1 });
 
     return res.status(200).json(liveClasses);
   } catch (error) {
@@ -785,9 +795,8 @@ exports.getLiveClassById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const liveClass = await LiveClass.query()
-      .findById(id)
-      .withGraphFetched("category");
+    const liveClass = await LiveClass.findById(id)
+      .populate("courseId");
 
     if (!liveClass) {
       return res.status(404).json({ message: "Live class not found" });
@@ -808,10 +817,9 @@ exports.updateLiveClass = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const updated = await LiveClass.query().patchAndFetchById(id, {
+    const updated = await LiveClass.findByIdAndUpdate(id, {
       ...req.body,
-      updatedAt: new Date(),
-    });
+    }, { new: true });
 
     if (!updated) {
       return res.status(404).json({ message: "Live class not found" });
@@ -832,7 +840,7 @@ exports.deleteLiveClass = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedRows = await LiveClass.query().deleteById(id);
+    const deletedRows = await LiveClass.findByIdAndDelete(id);
 
     if (!deletedRows) {
       return res.status(404).json({ message: "Live class not found" });
@@ -873,18 +881,18 @@ exports.createBlog = async (req, res) => {
 
     // Generate slug
     let slug = slugify(title, { lower: true, strict: true });
-    const existingSlug = await Blog.query().findOne({ slug });
+    const existingSlug = await Blog.findOne({ slug });
     if (existingSlug) {
       slug = `${slug}-${Date.now()}`;
     }
 
     // Save blog
-    const blog = await Blog.query().insert({
+    const blog = await Blog.create({
       title,
       slug,
       short_description,
       description: cleanDescription,
-      image: `uploads/${req.file.filename}`, // Always use the uploaded file
+      image: getFullUrl(`uploads/${req.file.filename}`), // Always use the uploaded file
     });
 
     return res.status(201).json({
@@ -909,19 +917,22 @@ exports.getAllBlogs = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = 10;
+    const skip = (page - 1) * limit;
 
-    const result = await Blog.query()
-      .select("id", "title", "slug", "short_description", "image", "created_at")
-      .orderBy("created_at", "desc")
-      .page(page - 1, limit);
+    const total = await Blog.countDocuments();
+    const results = await Blog.find()
+      .select("_id title slug short_description image created_at")
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       message: "Blog list fetched successfully",
       data: {
         current_page: page,
-        data: result.results,
-        total: result.total,
+        data: results,
+        total: total,
       },
     });
   } catch (error) {
@@ -941,7 +952,7 @@ exports.getBlogBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const blog = await Blog.query().where("slug", slug).first();
+    const blog = await Blog.findOne({ slug });
 
     if (!blog) {
       return res.status(404).json({
@@ -982,10 +993,10 @@ exports.updateBlog = async (req, res) => {
     // ✅ Handle slug if title changes
     if (req.body.title) {
       let newSlug = slugify(req.body.title, { lower: true, strict: true });
-      const existingSlug = await Blog.query()
-        .where("slug", newSlug)
-        .whereNot("id", id)
-        .first();
+      const existingSlug = await Blog.findOne({ 
+        slug: newSlug, 
+        _id: { $ne: id } 
+      });
       if (existingSlug) newSlug = `${newSlug}-${Date.now()}`;
       updateData.slug = newSlug;
     }
@@ -1004,7 +1015,7 @@ exports.updateBlog = async (req, res) => {
 
     // ✅ Handle image
     if (req.file) {
-      updateData.image = `uploads/${req.file.filename}`;
+      updateData.image = getFullUrl(`uploads/${req.file.filename}`);
 
       // Optional: delete old image
       const oldBlog = await Blog.query().findById(id);
@@ -1025,7 +1036,7 @@ exports.updateBlog = async (req, res) => {
         (updateData[key] === "" && delete updateData[key]),
     );
 
-    const updated = await Blog.query().patchAndFetchById(id, updateData);
+    const updated = await Blog.findByIdAndUpdate(id, updateData, { new: true });
 
     if (!updated)
       return res
@@ -1054,7 +1065,7 @@ exports.deleteBlog = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedRows = await Blog.query().deleteById(id);
+    const deletedRows = await Blog.findByIdAndDelete(id);
 
     if (!deletedRows) {
       return res.status(404).json({
@@ -1083,13 +1094,12 @@ exports.getAllTestimonials = async (req, res) => {
   try {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const testimonials = await Testimonial.query()
-      .where("is_active", true)
-      .orderBy("id", "desc");
+    const testimonials = await Testimonial.find({ is_active: true })
+      .sort({ _id: -1 });
 
     const formattedTestimonials = testimonials.map((item) => ({
       ...item,
-      image: item.image ? `${baseUrl}/uploads/${item.image}` : null,
+      image: getFullUrl(item.image),
     }));
 
     res.json({
@@ -1137,11 +1147,11 @@ exports.createTestimonial = async (req, res) => {
 
     const image = req.file ? req.file.filename : null;
 
-    const newTestimonial = await Testimonial.query().insert({
+    const newTestimonial = await Testimonial.create({
       name,
       role,
       text,
-      image,
+      image: getFullUrl(image),
     });
 
     res.status(201).json({
@@ -1178,12 +1188,13 @@ exports.updateTestimonial = async (req, res) => {
 
     // If new image uploaded
     if (req.file) {
-      updatedData.image = req.file.filename;
+      updatedData.image = getFullUrl(req.file.filename);
     }
 
-    const updated = await Testimonial.query().patchAndFetchById(
+    const updated = await Testimonial.findByIdAndUpdate(
       req.params.id,
       updatedData,
+      { new: true }
     );
 
     res.json({
@@ -1201,9 +1212,7 @@ exports.updateTestimonial = async (req, res) => {
  */
 exports.deleteTestimonial = async (req, res) => {
   try {
-    await Testimonial.query()
-      .findById(req.params.id)
-      .patch({ is_active: false });
+    await Testimonial.findByIdAndUpdate(req.params.id, { is_active: false });
 
     res.json({
       success: true,

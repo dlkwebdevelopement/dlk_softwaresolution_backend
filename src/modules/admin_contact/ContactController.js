@@ -1,4 +1,4 @@
-const Contact = require("../../models/admin_contact/contact"); // adjust path if needed
+const Contact = require("../../models/admin_contact/contact");
 
 // ✅ Create Contact Message
 exports.createContact = async (req, res) => {
@@ -21,8 +21,8 @@ exports.createContact = async (req, res) => {
       });
     }
 
-    // Insert using Objection
-    const newContact = await Contact.query().insert({
+    // Insert using Mongoose
+    const newContact = await Contact.create({
       first_name: firstName,
       last_name: lastName,
       email,
@@ -39,12 +39,12 @@ exports.createContact = async (req, res) => {
   } catch (error) {
     console.error("Contact Create Error:", error);
 
-    // ✅ Objection Model Validation Error
+    // ✅ Mongoose Model Validation Error
     if (error.name === "ValidationError") {
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors: error.data, // sends field-level errors
+        errors: error.errors,
       });
     }
 
@@ -59,7 +59,7 @@ exports.createContact = async (req, res) => {
 // ✅ Get All Contact Messages (Admin Side)
 exports.getAllContacts = async (req, res) => {
   try {
-    const contacts = await Contact.query().orderBy("created_at", "desc");
+    const contacts = await Contact.find().sort({ created_at: -1 });
 
     return res.status(200).json({
       success: true,
@@ -80,7 +80,7 @@ exports.getContactById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const contact = await Contact.query().findById(id);
+    const contact = await Contact.findById(id);
 
     if (!contact) {
       return res.status(404).json({
@@ -108,7 +108,7 @@ exports.deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deleted = await Contact.query().deleteById(id);
+    const deleted = await Contact.findByIdAndDelete(id);
 
     if (!deleted) {
       return res.status(404).json({
@@ -130,3 +130,4 @@ exports.deleteContact = async (req, res) => {
     });
   }
 };
+

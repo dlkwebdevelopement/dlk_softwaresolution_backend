@@ -1,15 +1,17 @@
-const { Model } = require("objection");
+const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
 
+const hiringCompsSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  companies: [{ type: String, trim: true }],
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-class HiringComps extends Model {
-  static get tableName() {
-    return "hiringComps";
-  }
+hiringCompsSchema.virtual("id").get(function() {
+  return this._id;
+});
 
-  $beforeInsert() {
-    this.id = uuidv4();
-  }
-}
-
-module.exports = HiringComps;
+module.exports = mongoose.model("HiringComps", hiringCompsSchema);
