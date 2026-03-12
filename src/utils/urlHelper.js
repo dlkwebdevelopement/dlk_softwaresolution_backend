@@ -9,9 +9,18 @@ const getFullUrl = (path) => {
 
   // Remove leading slash if any
   const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-  const baseUrl = process.env.BASE_URL || "http://localhost:5000";
+  
+  // Default to production domain if no BASE_URL provided in production environment
+  let baseUrl = process.env.BASE_URL || "http://localhost:5000";
+  
+  if (process.env.NODE_ENV === 'production' && !process.env.BASE_URL) {
+    baseUrl = "https://backend.dlksoftwaresolutions.co.in";
+  }
 
-  return `${baseUrl}/${cleanPath}`;
+  // Ensure no trailing slash on baseUrl
+  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+
+  return `${normalizedBaseUrl}/${cleanPath}`;
 };
 
 module.exports = { getFullUrl };

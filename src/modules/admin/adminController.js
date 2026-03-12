@@ -12,6 +12,7 @@ const LiveClass = require("../../models/admin_home/LiveClass");
 const fs = require("fs");
 const path = require("path");
 const Blog = require("../../models/admin_home/Blog");
+const Gallery = require("../../models/admin_home/Gallery");
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
@@ -70,6 +71,117 @@ exports.getCategories = async (req, res) => {
     res.status(200).json(data);
   } catch (err) {
     console.error("GET ALL CATEGORIES ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   GET GALLERY ALBUMS
+========================= */
+exports.getGallery = async (req, res) => {
+  try {
+    const data = await Gallery.find();
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("GET GALLERY ALBUMS ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   UPDATE GALLERY ALBUM
+========================= */
+exports.updateGallery = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { albumName } = req.body;
+
+    const existing = await Gallery.findById(id);
+    if (!existing) return res.status(404).json({ message: "Album not found" });
+
+    if (albumName) existing.albumName = albumName;
+    
+    await existing.save();
+    res.status(200).json({ message: "Album updated successfully", data: existing });
+  } catch (err) {
+    console.error("UPDATE GALLERY ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   ADD IMAGES TO GALLERY
+========================= */
+exports.addGalleryImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await Gallery.findById(id);
+    if (!existing) return res.status(404).json({ message: "Album not found" });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No images uploaded" });
+    }
+
+    // Move files to album-specific folder if needed, but for now we use the unique suffix from multer
+    // The user requested uploads/<albumName>/filename structure.
+    // We can rename/move them now.
+    
+    const newImages = req.files.map(file => {
+      const filename = file.filename;
+      const albumDir = path.join("uploads", existing.albumName);
+      if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
+      
+      const oldPath = file.path;
+      const newPath = path.join(albumDir, filename);
+      fs.renameSync(oldPath, newPath);
+      
+      return getFullUrl(`uploads/${existing.albumName}/${filename}`);
+    });
+
+    existing.images.push(...newImages);
+    await existing.save();
+
+    res.status(200).json({ message: "Images added successfully", data: existing });
+  } catch (err) {
+    console.error("ADD GALLERY IMAGES ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   DELETE GALLERY IMAGE
+========================= */
+exports.deleteGalleryImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.body || !req.body.imageUrl) {
+      return res.status(400).json({ message: "Image URL is required for deletion" });
+    }
+    const { imageUrl } = req.body; 
+
+    const existing = await Gallery.findById(id);
+    if (!existing) return res.status(404).json({ message: "Album not found" });
+
+    // Remove from array (db stores absolute or relative? My getter does absolute)
+    // We should find the matching path in the array
+    const imagePath = imageUrl; 
+    existing.images = existing.images.filter(img => img !== imagePath);
+    
+    // Delete physical file
+    try {
+      // Extract relative path from URL
+      const urlObj = new URL(imageUrl);
+      const relativePath = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
+      const physicalPath = path.join(process.cwd(), relativePath);
+      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+    } catch (e) {
+      console.warn("Could not delete physical file:", e.message);
+    }
+
+    await existing.save();
+    res.status(200).json({ message: "Image deleted successfully", data: existing });
+  } catch (err) {
+    console.error("DELETE GALLERY IMAGE ERROR:", err);
     res.status(500).json({ message: err.message });
   }
 };

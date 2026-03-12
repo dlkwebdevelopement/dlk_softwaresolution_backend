@@ -51,6 +51,10 @@ const {
   createTestimonial,
   updateTestimonial,
   deleteTestimonial,
+  getGallery,
+  updateGallery,
+  addGalleryImages,
+  deleteGalleryImage,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -130,5 +134,11 @@ router.get("/testimonial/:id", getTestimonial);
 router.post("/testimonial", upload.single("image"), createTestimonial);
 router.put("/testimonial/:id", upload.single("image"), updateTestimonial);
 router.delete("/testimonial/:id", deleteTestimonial);
+
+// ✅ Gallery Routes
+router.get("/gallery", getGallery);
+router.patch("/gallery/:id", updateGallery);
+router.post("/gallery/:id/images", upload.array("images"), addGalleryImages);
+router.delete("/gallery/:id/image", deleteGalleryImage);
 
 module.exports = router;
