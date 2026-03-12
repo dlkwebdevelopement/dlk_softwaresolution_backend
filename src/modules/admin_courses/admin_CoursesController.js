@@ -44,7 +44,7 @@ exports.getCourseBySlug = async (req, res) => {
     courseObj.thumbnail_url = getFullUrl(courseObj.thumbnail);
 
     courseObj.syllabus_pdf_url = courseObj.syllabus_pdf
-      ? getFullUrl(`uploads/syllabus/${courseObj.syllabus_pdf}`)
+      ? getFullUrl(courseObj.syllabus_pdf)
       : null;
 
     return res.status(200).json({
@@ -345,7 +345,7 @@ exports.getAllCourses = async (req, res) => {
         original_price: Number(c.original_price),
         rating: Number(c.rating),
         thumbnail_url: getFullUrl(c.thumbnail),
-        syllabus_pdf_url: getFullUrl(c.syllabus_pdf ? `uploads/syllabus/${c.syllabus_pdf}` : null),
+        syllabus_pdf_url: getFullUrl(c.syllabus_pdf),
       };
     });
 
@@ -385,7 +385,7 @@ exports.getCoursesByCategory = async (req, res) => {
         original_price: Number(c.original_price),
         rating: Number(c.rating),
         thumbnail_url: getFullUrl(c.thumbnail),
-        syllabus_pdf_url: getFullUrl(c.syllabus_pdf ? `uploads/syllabus/${c.syllabus_pdf}` : null),
+        syllabus_pdf_url: getFullUrl(c.syllabus_pdf),
       };
     });
 

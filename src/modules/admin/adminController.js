@@ -521,7 +521,7 @@ exports.deleteBanner = async (req, res) => {
 // ✅ Upload company photo
 exports.uploadCompany = async (req, res) => {
   try {
-    const company = await Company.create({ photoUrl: getFullUrl(req.file.path) });
+    const company = await Company.create({ photoUrl: getFullUrl(`uploads/${req.file.filename}`) });
     res.json({ message: "Company photo uploaded", company });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1263,7 +1263,7 @@ exports.createTestimonial = async (req, res) => {
       name,
       role,
       text,
-      image: getFullUrl(image),
+      image: getFullUrl(`uploads/${image}`),
     });
 
     res.status(201).json({
@@ -1300,7 +1300,7 @@ exports.updateTestimonial = async (req, res) => {
 
     // If new image uploaded
     if (req.file) {
-      updatedData.image = getFullUrl(req.file.filename);
+      updatedData.image = getFullUrl(`uploads/${req.file.filename}`);
     }
 
     const updated = await Testimonial.findByIdAndUpdate(
