@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Error</title>
+</head>
+<body>
+<pre>Cannot GET /uploads/syllabus/http://localhost:5000/uploads/syllabus/1773237832273-669042141.pdf</pre>
+</body>
+</html>
