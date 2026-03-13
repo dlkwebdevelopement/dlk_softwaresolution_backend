@@ -16,7 +16,7 @@ exports.getCourseBySlug = async (req, res) => {
     const course = await Course.findOne({ slug })
       .populate({
         path: "category_id",
-        model: "Navbar"
+        model: "CourseCategory"
       });
 
     if (!course) {
@@ -27,7 +27,7 @@ exports.getCourseBySlug = async (req, res) => {
     const whoShouldEnroll = await CourseWhoShouldEnroll.find({ course_id: course._id }).sort({ order_index: 1 });
     const learningPoints = await CourseLearningPoint.find({ course_id: course._id }).sort({ order_index: 1 });
     const curriculum = await CourseCurriculum.find({ course_id: course._id }).sort({ order_index: 1 });
-    const reviews = await CourseReview.find({ course_id: course._id }).sort({ created_at: -1 });
+    const reviews = await CourseReview.find({ course_id: course._id }).sort({ createdAt: -1 });
 
     const courseObj = course.toObject();
     courseObj.whoShouldEnroll = whoShouldEnroll;
@@ -117,21 +117,21 @@ exports.createCourse = async (req, res) => {
     if (whoShouldEnroll) {
       const parsed = safeParse(whoShouldEnroll);
       if (parsed.length > 0) {
-        await CourseWhoShouldEnroll.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+        await CourseWhoShouldEnroll.insertMany(parsed.map(item => ({ ...item, course_id: courseId })), { session });
       }
     }
 
     if (learningPoints) {
       const parsed = safeParse(learningPoints);
       if (parsed.length > 0) {
-        await CourseLearningPoint.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+        await CourseLearningPoint.insertMany(parsed.map(item => ({ ...item, course_id: courseId })), { session });
       }
     }
 
     if (curriculum) {
       const parsed = safeParse(curriculum);
       if (parsed.length > 0) {
-        await CourseCurriculum.create(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+        await CourseCurriculum.insertMany(parsed.map(item => ({ ...item, course_id: courseId })), { session });
       }
     }
 
@@ -282,21 +282,21 @@ exports.updateCourse = async (req, res) => {
     if (parsedWhoShouldEnroll !== null) {
       await CourseWhoShouldEnroll.deleteMany({ course_id: id }, { session });
       if (parsedWhoShouldEnroll.length > 0) {
-        await CourseWhoShouldEnroll.create(parsedWhoShouldEnroll.map(item => ({ ...item, course_id: id })), { session });
+        await CourseWhoShouldEnroll.insertMany(parsedWhoShouldEnroll.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
     if (parsedLearningPoints !== null) {
       await CourseLearningPoint.deleteMany({ course_id: id }, { session });
       if (parsedLearningPoints.length > 0) {
-        await CourseLearningPoint.create(parsedLearningPoints.map(item => ({ ...item, course_id: id })), { session });
+        await CourseLearningPoint.insertMany(parsedLearningPoints.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
     if (parsedCurriculum !== null) {
       await CourseCurriculum.deleteMany({ course_id: id }, { session });
       if (parsedCurriculum.length > 0) {
-        await CourseCurriculum.create(parsedCurriculum.map(item => ({ ...item, course_id: id })), { session });
+        await CourseCurriculum.insertMany(parsedCurriculum.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 
@@ -331,7 +331,7 @@ exports.getAllCourses = async (req, res) => {
 
     const total = await Course.countDocuments();
     const courses = await Course.find()
-      .sort({ created_at: -1 })
+      .sort({ createdAt: -1 })
       .skip(offset)
       .limit(limit);
 
@@ -374,7 +374,7 @@ exports.getCoursesByCategory = async (req, res) => {
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
     const courses = await Course.find({ category_id: categoryId })
-      .sort({ created_at: -1 });
+      .sort({ createdAt: -1 });
 
     const formattedCourses = courses.map((course) => {
       const c = course.toObject();

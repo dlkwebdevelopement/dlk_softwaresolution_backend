@@ -5,7 +5,7 @@ const { getFullUrl } = require("../../utils/urlHelper");
 
 const courseSchema = new mongoose.Schema({
   _id: { type: String, default: uuidv4 },
-  category_id: { type: String, ref: "Navbar", required: true, index: true },
+  category_id: { type: String, ref: "CourseCategory", required: true, index: true },
   title: { type: String, required: true, trim: true },
   slug: { type: String, required: true, unique: true, trim: true },
   short_description: { type: String, trim: true },
@@ -22,7 +22,7 @@ const courseSchema = new mongoose.Schema({
   discount_percentage: { type: Number },
   syllabus_pdf: { type: String, trim: true },
 }, { 
-  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  timestamps: true,
   toJSON: { virtuals: true, getters: true },
   toObject: { virtuals: true, getters: true }
 });

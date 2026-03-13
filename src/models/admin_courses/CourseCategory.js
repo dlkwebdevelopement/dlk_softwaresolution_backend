@@ -1,11 +1,11 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-
 const { getFullUrl } = require("../../utils/urlHelper");
 
-const navbarSchema = new mongoose.Schema({
+const courseCategorySchema = new mongoose.Schema({
   _id: { type: String, default: uuidv4 },
-  category: { type: String, required: true, trim: true, index: true },
+  categoryName: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true, trim: true },
   image: { type: String, trim: true, get: getFullUrl },
   description: { type: String, trim: true },
 }, { 
@@ -14,8 +14,8 @@ const navbarSchema = new mongoose.Schema({
   toObject: { virtuals: true, getters: true }
 });
 
-navbarSchema.virtual("id").get(function() {
+courseCategorySchema.virtual("id").get(function() {
   return this._id;
 });
 
-module.exports = mongoose.model("Navbar", navbarSchema);
+module.exports = mongoose.model("CourseCategory", courseCategorySchema);

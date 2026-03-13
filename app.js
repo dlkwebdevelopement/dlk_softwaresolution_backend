@@ -3,6 +3,8 @@ const cors = require("cors");
 const bodyParser = require("body-parser");
 const path = require("path");
 const mongoose = require("mongoose");
+const http = require("http");
+const { initSocket } = require("./src/utils/socket");
 require("dotenv").config();
 
 // Connect to MongoDB
@@ -11,6 +13,10 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch((err) => console.log("❌ MongoDB Connection Error:", err));
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+initSocket(server);
 
 // ✅ Middleware
 app.use(
@@ -56,6 +62,6 @@ app.use((err, req, res, next) => {
 
 // ✅ Start server
 const PORT = process.env.NODE_ENV === "production" ? 6000 : 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port http://localhost:${PORT}`);
 });

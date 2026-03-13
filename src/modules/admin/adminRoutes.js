@@ -8,12 +8,9 @@ const {
   getCategories,
   updateCategory,
   deleteCategory,
-  createSubcategory,
-  getSubcategories,
-  updateSubcategory,
-  deleteSubcategory,
   getEnquiries,
   uploadBanner,
+  updateBanner,
   getBanners,
   deleteBanner,
   uploadCompany,
@@ -27,15 +24,16 @@ const {
   updateAnswer,
   deleteAnswer,
 
-  // ✅ Hiring Company Functions (from controller)
-  createHiring,
-  getAllHiring,
-  updateHiring,
-  deleteHiring,
   createEnquiry,
   getCategoriesWithSubs,
   createRegistration,
   getRegistrations,
+  markRegistrationRead,
+  replyToRegistration,
+  deleteRegistration,
+  markEnquiryRead,
+  replyToEnquiry,
+  deleteEnquiry,
   createLiveClass,
   getAllLiveClasses,
   getLiveClassById,
@@ -67,19 +65,17 @@ router.put("/category/:id", upload.single("image"), updateCategory);
 router.delete("/category/:id", deleteCategory);
 router.get("/categorywithsub", getCategoriesWithSubs);
 
-// ✅ Subcategory Routes
-router.post("/subcategory", createSubcategory);
-router.get("/subcategories", getSubcategories);
-router.put("/subcategory/:id", updateSubcategory);
-router.delete("/subcategory/:id", deleteSubcategory);
-
 // ✅ Enquiries
 router.get("/enquiries", getEnquiries);
 router.post("/enquiries", createEnquiry);
+router.patch("/enquiries/:id/read", markEnquiryRead);
+router.post("/enquiries/reply", replyToEnquiry);
+router.delete("/enquiries/:id", deleteEnquiry);
 
-// ✅ Banner Upload, Get & Delete
+// ✅ Banner Upload, Get, Update & Delete
 router.post("/upload-banner", upload.single("photo"), uploadBanner);
 router.get("/banners", getBanners);
+router.put("/banner/:id", upload.single("photo"), updateBanner);
 router.delete("/banner/:id", deleteBanner);
 
 // ✅ Company Upload, Get & Delete
@@ -96,15 +92,13 @@ router.delete("/faq/question/:id", deleteQuestion);
 router.put("/faq/answer/:id", updateAnswer);
 router.delete("/faq/answer/:id", deleteAnswer);
 
-// ✅ Hiring Companies Routes
-router.post("/hiring", createHiring);
-router.get("/hiring", getAllHiring);
-router.put("/hiring/:id", updateHiring);
-router.delete("/hiring/:id", deleteHiring);
 
 // for registration
 router.post("/register", createRegistration);
 router.get("/register", getRegistrations);
+router.patch("/register/:id/read", markRegistrationRead);
+router.post("/register/reply", replyToRegistration);
+router.delete("/register/:id", deleteRegistration);
 
 //for upcoming live classes
 router.post("/liveclass", createLiveClass);

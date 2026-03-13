@@ -11,13 +11,15 @@ const contactSchema = new mongoose.Schema({
     trim: true, 
     lowercase: true, 
     index: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address']
   },
   phone: { type: String, trim: true },
   message: { type: String, required: true, trim: true },
   accept_terms: { type: Boolean, default: true },
+  isRead: { type: Boolean, default: false },
+  isReply: { type: Boolean, default: false },
 }, { 
-  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });

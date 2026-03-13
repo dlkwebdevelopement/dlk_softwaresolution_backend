@@ -1,11 +1,10 @@
 const Admin = require("../../models/admin_home/Admin");
 const Banner = require("../../models/admin_home/Banner");
-const Navbar = require("../../models/admin_home/Navbar");
-const Subcategory = require("../../models/admin_home/Subcategory");
+const CourseCategory = require("../../models/admin_courses/CourseCategory");
+const Course = require("../../models/admin_courses/Course");
 const Company = require("../../models/admin_home/Company");
 const Enquiry = require("../../models/admin_home/Enquiry");
 const { Question, Answer } = require("../../models/admin_home/Question");
-const HiringComps = require("../../models/admin_home/HiringComps");
 const Registration = require("../../models/admin_home/Registration");
 const LiveClass = require("../../models/admin_home/LiveClass");
 
@@ -19,6 +18,7 @@ const Testimonial = require("../../models/admin_home/Testimonials");
 const transporter = require("../../utils/mailsender");
 const mongoose = require("mongoose");
 const { getFullUrl } = require("../../utils/urlHelper");
+const { getIO } = require("../../utils/socket");
 
 // ✅ Admin login
 exports.adminLogin = async (req, res) => {
@@ -38,16 +38,17 @@ exports.adminLogin = async (req, res) => {
 ========================= */
 exports.createCategory = async (req, res) => {
   try {
-    console.log("BODY:", req.body);
+    const { categoryName, description } = req.body;
 
-    const { category, description } = req.body;
-
-    if (!category) {
-      return res.status(400).json({ message: "Category is required" });
+    if (!categoryName) {
+      return res.status(400).json({ message: "Category name is required" });
     }
 
-    const data = await Navbar.create({
-      category,
+    const slug = slugify(categoryName, { lower: true, strict: true });
+
+    const data = await CourseCategory.create({
+      categoryName,
+      slug,
       description: description || null,
       image: req.file ? getFullUrl(`uploads/${req.file.filename}`) : null,
     });
@@ -67,7 +68,30 @@ exports.createCategory = async (req, res) => {
 ========================= */
 exports.getCategories = async (req, res) => {
   try {
-    const data = await Navbar.find();
+    const data = await CourseCategory.aggregate([
+      {
+        $lookup: {
+          from: "courses", // The name of the collection in MongoDB (usually lowercase plural)
+          localField: "_id",
+          foreignField: "category_id",
+          as: "courses"
+        }
+      },
+      {
+        $addFields: {
+          courseCount: { $size: "$courses" },
+          id: "$_id" // Add 'id' field to match Mongoose virtuals behavior
+        }
+      },
+      {
+        $project: {
+          courses: 0 // Remove the full courses array to save bandwidth
+        }
+      },
+      {
+        $sort: { updatedAt: -1 }
+      }
+    ]);
     res.status(200).json(data);
   } catch (err) {
     console.error("GET ALL CATEGORIES ERROR:", err);
@@ -191,9 +215,9 @@ exports.deleteGalleryImage = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { category, description } = req.body;
+    const { categoryName, description } = req.body;
 
-    const existing = await Navbar.findById(id);
+    const existing = await CourseCategory.findById(id);
 
     if (!existing) {
       return res.status(404).json({ message: "Category not found" });
@@ -208,11 +232,17 @@ exports.updateCategory = async (req, res) => {
       image = getFullUrl(`uploads/${req.file.filename}`);
     }
 
-    const updated = await Navbar.findByIdAndUpdate(id, {
-      category: category ?? existing.category,
+    const updateData = {
+      categoryName: categoryName ?? existing.categoryName,
       description: description ?? existing.description,
       image,
-    }, { new: true });
+    };
+
+    if (categoryName) {
+      updateData.slug = slugify(categoryName, { lower: true, strict: true });
+    }
+
+    const updated = await CourseCategory.findByIdAndUpdate(id, updateData, { new: true });
 
     res.status(200).json({
       message: "Category updated successfully",
@@ -232,7 +262,7 @@ exports.deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const existing = await Navbar.findById(id);
+    const existing = await CourseCategory.findById(id);
 
     if (!existing) {
       return res.status(404).json({ message: "Category not found" });
@@ -244,68 +274,12 @@ exports.deleteCategory = async (req, res) => {
       if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
     }
 
-    await Navbar.findByIdAndDelete(id);
+    await CourseCategory.findByIdAndDelete(id);
 
     res.status(200).json({ message: "Category deleted successfully" });
   } catch (err) {
     console.error("DELETE CATEGORY ERROR:", err);
     res.status(500).json({ message: err.message });
-  }
-};
-
-// ✅ Create subcategory
-exports.createSubcategory = async (req, res) => {
-  try {
-    const subcategory = await Subcategory.create({
-      category_id: req.body.category_id,
-      subcategory: req.body.subcategory,
-    });
-    res.json({ message: "Subcategory added", subcategory });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Get all subcategories
-exports.getSubcategories = async (req, res) => {
-  try {
-    const subcategories = await Subcategory.find().populate("category_id");
-    res.json(subcategories);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Edit subcategory
-exports.updateSubcategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { subcategory, category_id } = req.body;
-
-    const updated = await Subcategory.findByIdAndUpdate(id, {
-      subcategory,
-      category_id,
-    }, { new: true });
-
-    if (!updated)
-      return res.status(404).json({ message: "Subcategory not found" });
-    res.json({ message: "Subcategory updated successfully", updated });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Delete subcategory
-exports.deleteSubcategory = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleted = await Subcategory.findByIdAndDelete(id);
-
-    if (!deleted)
-      return res.status(404).json({ message: "Subcategory not found" });
-    res.json({ message: "Subcategory deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
   }
 };
 
@@ -315,33 +289,102 @@ exports.deleteSubcategory = async (req, res) => {
 exports.getCategoriesWithSubs = async (req, res) => {
   try {
     // Fetch all categories
-    const categories = await Navbar.find();
+    const categories = await CourseCategory.find();
 
-    // Fetch all subcategories
-    const subcategories = await Subcategory.find();
+    // Fetch all courses
+    const courses = await Course.find({}, "title slug category_id");
 
-    // Nest subcategories under their categories
+    // Nest courses under their categories (acting as subcategories)
     const result = categories.map((cat) => {
       const c = cat.toObject();
       return {
         ...c,
-        subcategories: subcategories
-          .filter((sub) => String(sub.category_id) === String(cat._id))
-          .map((sub) => sub.toObject()),
+        category: c.categoryName, // For backward compatibility with frontend if needed
+        subcategories: courses
+          .filter((course) => String(course.category_id) === String(cat._id))
+          .map((course) => ({
+            id: course._id,
+            subcategory: course.title, // Treat course title as subcategory name
+            slug: course.slug,
+          })),
       };
     });
 
     res.status(200).json(result);
   } catch (err) {
-    console.error("GET CATEGORIES WITH SUBCATEGORIES ERROR:", err);
+    console.error("GET CATEGORIES WITH COURSES ERROR:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+// ✅ Mark enquiry as read
+exports.markEnquiryRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const enquiry = await Enquiry.findByIdAndUpdate(id, { isRead: true }, { new: true });
+    if (!enquiry) return res.status(404).json({ message: "Enquiry not found" });
+    res.status(200).json({ message: "Enquiry marked as read", data: enquiry });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Reply to enquiry via email
+exports.replyToEnquiry = async (req, res) => {
+  try {
+    const { id, replyMessage } = req.body;
+    if (!id || !replyMessage) return res.status(400).json({ error: "ID and reply message required" });
+
+    const enquiry = await Enquiry.findById(id);
+    if (!enquiry) return res.status(404).json({ message: "Enquiry not found" });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: enquiry.email,
+      subject: `Response to your Inquiry - DLK Software Solutions`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <h2 style="color: #2c3e50;">Hello ${enquiry.name},</h2>
+          <p>Thank you for reaching out to us regarding <strong>${enquiry.course}</strong>.</p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 10px; margin: 20px 0; border-left: 4px solid #27ae60;">
+            ${replyMessage.replace(/\n/g, '<br/>')}
+          </div>
+          <p>If you have any further questions, feel free to reply to this email or call us at ${process.env.PHONE || '+91-XXXXXXXXXX'}.</p>
+          <hr/>
+          <p style="font-size: 12px; color: gray;">Best Regards,<br/>Admission Team<br/>DLK Software Solutions</p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    
+    enquiry.isReply = true;
+    enquiry.isRead = true;
+    await enquiry.save();
+
+    res.status(200).json({ message: "Reply sent successfully" });
+  } catch (err) {
+    console.error("REPLY ENQUIRY ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Delete enquiry
+exports.deleteEnquiry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Enquiry.findByIdAndDelete(id);
+    if (!deleted) return res.status(404).json({ message: "Enquiry not found" });
+    res.status(200).json({ message: "Enquiry deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 };
 
 // ✅ Get enquiries
 exports.getEnquiries = async (req, res) => {
   try {
-    const data = await Enquiry.find();
+    const data = await Enquiry.find().sort({ createdAt: -1 });
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -367,67 +410,65 @@ exports.createEnquiry = async (req, res) => {
       timeslot,
     });
 
-    // 2️⃣ Send response immediately
-    res.status(201).json({
-      message: "Enquiry submitted successfully",
-      data: newEnquiry,
-    });
+    // 📩 User Auto-Reply Template
+    const userAutoReply = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Enquiry Received - DLK Software Solutions",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #3DB843;">Hello ${name},</h2>
+          <p>Thank you for your interest in our <strong>${course}</strong> course. We have received your enquiry and our team will contact you shortly.</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Preferred Timeslot:</strong> ${timeslot}</p>
+            <p><strong>Location:</strong> ${location}</p>
+          </div>
+          <p>Best Regards,<br/><strong>DLK Support Team</strong></p>
+        </div>
+      `,
+    };
 
-    // ==============================
-    // 📩 ADMIN EMAIL TEMPLATE
-    // ==============================
-
+    // 📩 Admin Notification Template
     const adminTemplate = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #2c3e50;">📌 New Course Enquiry Received</h2>
-        <p>You have received a new enquiry through the website.</p>
-        
         <table style="border-collapse: collapse; width: 100%; margin-top: 15px;">
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Name</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${name}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Email</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Mobile</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${mobile}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Course</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${course}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Location</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${location}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd;"><strong>Preferred Timeslot</strong></td>
-            <td style="padding: 8px; border: 1px solid #ddd;">${timeslot}</td>
-          </tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Name</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${name}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${email}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Mobile</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${mobile}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Course</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${course}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Location</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${location}</td></tr>
+          <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Preferred Timeslot</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${timeslot}</td></tr>
         </table>
-
-        <p style="margin-top: 20px;">
-          Please follow up with the student at the earliest.
-        </p>
-
-        <hr/>
-        <p style="font-size: 12px; color: gray;">
-          This is an automated notification from your website enquiry system.
-        </p>
       </div>
     `;
 
-    transporter
-      .sendMail({
-        from: process.env.EMAIL_USER,
-        to: process.env.EMAIL_USER,
-        subject: `New Enquiry - ${course}`,
-        html: adminTemplate,
-      })
-      .catch((err) => console.error("Admin email failed:", err.message));
+    // Send Emails asynchronously
+    transporter.sendMail(userAutoReply).catch(err => console.error("User auto-reply failed:", err.message));
+    transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER,
+      subject: `New Enquiry Alert - ${course}`,
+      html: adminTemplate,
+    }).catch(err => console.error("Admin notification failed:", err.message));
+
+    // ⚡ Emit Socket Event
+    try {
+      getIO().emit("newEnquiry", {
+        id: newEnquiry._id,
+        name: name,
+        course: course,
+        type: "Enquiry",
+        time: new Date()
+      });
+    } catch (err) {
+      console.error("Socket emission failed:", err.message);
+    }
+
+    return res.status(201).json({
+      message: "Enquiry submitted successfully!",
+      data: newEnquiry,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -471,6 +512,52 @@ exports.uploadBanner = async (req, res) => {
     });
   } catch (err) {
     console.error("UPLOAD BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Update banner
+exports.updateBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, highlight, subtitle, tagline, description, button } = req.body;
+
+    const existing = await Banner.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    let photoUrl = existing.photoUrl;
+
+    if (req.file) {
+      // Delete old photo
+      const oldPath = path.join(
+        __dirname,
+        "../../../uploads",
+        path.basename(existing.photoUrl)
+      );
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+      photoUrl = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    existing.title = title ?? existing.title;
+    existing.highlight = highlight ?? existing.highlight;
+    existing.subtitle = subtitle ?? existing.subtitle;
+    existing.tagline = tagline ?? existing.tagline;
+    existing.description = description ?? existing.description;
+    existing.button = button ?? existing.button;
+    existing.photoUrl = photoUrl;
+
+    await existing.save();
+
+    res.status(200).json({
+      message: "Banner updated successfully",
+      banner: existing,
+    });
+  } catch (err) {
+    console.error("UPDATE BANNER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -708,68 +795,6 @@ exports.deleteAnswer = async (req, res) => {
   }
 };
 
-// ✅ Create a new hiring company
-exports.createHiring = async (req, res) => {
-  try {
-    const { companies } = req.body;
-    if (!companies) {
-      return res.status(400).json({ message: "Company name is required" });
-    }
-
-    const newHiring = await HiringComps.create({ companies });
-    res
-      .status(201)
-      .json({ message: "Company name created", hiring: newHiring });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Get all hiring companies
-exports.getAllHiring = async (req, res) => {
-  try {
-    const hiringList = await HiringComps.find();
-    res.status(200).json(hiringList);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Update a hiring company name
-exports.updateHiring = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { companies } = req.body;
-
-    const updated = await HiringComps.findByIdAndUpdate(id, {
-      companies,
-    }, { new: true });
-
-    if (!updated) {
-      return res.status(404).json({ message: "Company not found" });
-    }
-
-    res.status(200).json({ message: "Company updated successfully", updated });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// ✅ Delete a hiring company
-exports.deleteHiring = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleted = await HiringComps.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Company not found" });
-    }
-
-    res.status(200).json({ message: "Company deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
 
 //registration
 
@@ -778,30 +803,102 @@ exports.deleteHiring = async (req, res) => {
  */
 exports.createRegistration = async (req, res) => {
   try {
-    const { fullName, email, phone, courseId } = req.body;
+    const { fullName, email, phone, courseId, inquiryType } = req.body;
 
-    // Validate input
     if (!fullName || !email || !phone || !courseId) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Check if courseId exists
-    const course = await Navbar.findById(courseId);
+    console.log("Registration request received for courseId:", courseId);
+    
+    let course = await CourseCategory.findById(courseId);
     if (!course) {
-      return res.status(404).json({ message: "Selected course not found" });
+      console.log("Course not found in CourseCategory, checking Course model...");
+      course = await Course.findById(courseId);
     }
 
+    if (!course) {
+      console.error("Selected course/category not found in DB for ID:", courseId);
+      return res.status(404).json({ message: "Selected course not found" });
+    }
+    
+    console.log("Course/Category found:", course.categoryName || course.title);
+
     const registration = await Registration.create({
-      fullName,
+      name: fullName,
       email,
-      phone,
+      mobile: phone,
       courseId,
+      inquiryType,
     });
+
+    const courseName = course.categoryName || course.category || course.title;
+
+    // 📩 User Auto-Reply
+    const userReply = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Registration Successful - DLK Software Solutions",
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+          <h2 style="color: #3DB843;">Hello ${fullName},</h2>
+          <p>You have successfully registered for our <strong>${courseName}</strong> course. We're excited to have you on board!</p>
+          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Inquiry Type:</strong> ${inquiryType || 'General Registration'}</p>
+          </div>
+          <p>Our training advisors will reach out to you shortly with more details.</p>
+          <p>Best Regards,<br/><strong>The DLK Academy Team</strong></p>
+        </div>
+      `,
+    };
+
+    // 📩 Admin Notification
+    const adminNotif = {
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER,
+      subject: `New Course Registration - ${courseName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <h2 style="color: #2c3e50;">🎓 New Registration Received</h2>
+          <table style="border-collapse: collapse; width: 100%; margin-top: 15px;">
+            <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Student Name</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${email}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Mobile</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${phone}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Course</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${courseName}</td></tr>
+            <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Inquiry Type</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${inquiryType || 'N/A'}</td></tr>
+          </table>
+        </div>
+      `,
+    };
+
+    // ⚡ Emit Socket Event (Real-time update)
+    try {
+      getIO().emit("newRegistration", {
+        id: registration._id,
+        name: fullName,
+        course: courseName,
+        type: "Registration",
+        inquiryType: inquiryType || "General",
+        time: new Date()
+      });
+      console.log("Socket event emitted: newRegistration");
+    } catch (err) {
+      console.error("Socket emission failed:", err.message);
+    }
+
+    // Send Emails asynchronously
+    transporter.sendMail(userReply)
+      .then(() => console.log("Success: Student confirmation email sent"))
+      .catch(err => console.error("Reg user mail failed:", err.message));
+      
+    transporter.sendMail(adminNotif)
+      .then(() => console.log("Success: Admin notification email sent"))
+      .catch(err => console.error("Reg admin mail failed:", err.message));
 
     return res.status(201).json({
       message: "Registration successful",
       registration,
-      courseName: course.category, // Return course name too
+      courseName,
     });
   } catch (error) {
     console.error(error);
@@ -816,25 +913,97 @@ exports.getRegistrations = async (req, res) => {
   try {
     const registrations = await Registration.find().populate("courseId");
 
-    // Format response
-    const formatted = registrations.map((r) => {
+    // Format response and enrich with names if populate failed
+    const formatted = await Promise.all(registrations.map(async (r) => {
       const robj = r.toObject();
+      let courseName = "Unknown";
+      
+      if (robj.courseId) {
+        if (typeof robj.courseId === 'object') {
+          courseName = robj.courseId.categoryName || robj.courseId.title || "Unknown";
+        } else {
+          // If populate failed (robj.courseId is still a string), try manual lookup
+          const cat = await CourseCategory.findById(robj.courseId);
+          if (cat) {
+            courseName = cat.categoryName;
+          } else {
+            const course = await Course.findById(robj.courseId);
+            courseName = course ? course.title : "Unknown";
+          }
+        }
+      }
+
       return {
         id: robj._id,
-        fullName: robj.fullName,
+        fullName: robj.name,
         email: robj.email,
-        phone: robj.phone,
-        courseId: robj.courseId?._id || robj.courseId,
-        courseName: robj.courseId?.category,
+        phone: robj.mobile,
+        courseName,
+        isRead: robj.isRead,
+        isReply: robj.isReply,
+        inquiryType: robj.inquiryType,
+        createdAt: robj.createdAt
       };
-    });
+    }));
 
-    return res.json(formatted);
+    return res.status(200).json(formatted);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: "Server error" });
   }
 };
+
+/**
+ * Mark registration as read
+ */
+exports.markRegistrationRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Registration.findByIdAndUpdate(id, { isRead: true });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Reply to registration via email
+ */
+exports.replyToRegistration = async (req, res) => {
+  try {
+    const { id, replyMessage } = req.body;
+    const registration = await Registration.findById(id);
+    if (!registration) return res.status(404).json({ message: "Not found" });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: registration.email,
+      subject: "Update Regarding Your Course Registration",
+      text: replyMessage,
+    };
+
+    await transporter.sendMail(mailOptions);
+    await Registration.findByIdAndUpdate(id, { isReply: true, isRead: true });
+
+    res.status(200).json({ success: true, message: "Reply sent" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Delete registration
+ */
+exports.deleteRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Registration.findByIdAndDelete(id);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 /**
  * CREATE Live Class
@@ -1033,8 +1202,8 @@ exports.getAllBlogs = async (req, res) => {
 
     const total = await Blog.countDocuments();
     const results = await Blog.find()
-      .select("_id title slug short_description image created_at")
-      .sort({ created_at: -1 })
+      .select("_id title slug short_description image createdAt")
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
@@ -1130,7 +1299,7 @@ exports.updateBlog = async (req, res) => {
       updateData.image = getFullUrl(`uploads/${req.file.filename}`);
 
       // Optional: delete old image
-      const oldBlog = await Blog.query().findById(id);
+      const oldBlog = await Blog.findById(id);
       if (oldBlog?.image) {
         const oldImagePath = path.join(__dirname, "../../", oldBlog.image);
         console.log("Deleting old image:", oldImagePath);
@@ -1228,7 +1397,7 @@ exports.getAllTestimonials = async (req, res) => {
  */
 exports.getTestimonial = async (req, res) => {
   try {
-    const testimonial = await Testimonial.query().findById(req.params.id);
+    const testimonial = await Testimonial.findById(req.params.id);
 
     if (!testimonial) {
       return res.status(404).json({
@@ -1281,7 +1450,7 @@ exports.createTestimonial = async (req, res) => {
  */
 exports.updateTestimonial = async (req, res) => {
   try {
-    const testimonial = await Testimonial.query().findById(req.params.id);
+    const testimonial = await Testimonial.findById(req.params.id);
 
     if (!testimonial) {
       return res.status(404).json({

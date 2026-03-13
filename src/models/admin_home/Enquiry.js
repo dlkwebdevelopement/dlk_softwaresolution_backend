@@ -10,14 +10,16 @@ const enquirySchema = new mongoose.Schema({
     trim: true, 
     lowercase: true, 
     index: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address']
   },
   mobile: { type: String, required: true, trim: true },
   course: { type: String, required: true, trim: true, index: true },
   location: { type: String, required: true, trim: true },
   timeslot: { type: String, required: true, trim: true },
+  isRead: { type: Boolean, default: false },
+  isReply: { type: Boolean, default: false },
 }, { 
-  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });

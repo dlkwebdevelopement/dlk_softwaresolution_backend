@@ -11,7 +11,7 @@ const courseReviewSchema = new mongoose.Schema({
   helpful_yes: { type: Number, default: 0 },
   helpful_no: { type: Number, default: 0 },
 }, { 
-  timestamps: { createdAt: "created_at", updatedAt: "updated_at" },
+  timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });

@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const registrationSchema = new mongoose.Schema({
   _id: { type: String, default: uuidv4 },
-  courseId: { type: String, ref: "Navbar", required: true, index: true },
+  courseId: { type: String, ref: "CourseCategory", required: true, index: true },
   name: { type: String, required: true, trim: true },
   email: { 
     type: String, 
@@ -11,10 +11,13 @@ const registrationSchema = new mongoose.Schema({
     trim: true, 
     lowercase: true, 
     index: true,
-    match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Please fill a valid email address']
+    match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Please fill a valid email address']
   },
   mobile: { type: String, trim: true },
   location: { type: String, trim: true },
+  isRead: { type: Boolean, default: false },
+  isReply: { type: Boolean, default: false },
+  inquiryType: { type: String, trim: true },
 }, { 
   timestamps: true,
   toJSON: { virtuals: true },

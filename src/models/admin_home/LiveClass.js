@@ -3,7 +3,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const liveClassSchema = new mongoose.Schema({
   _id: { type: String, default: uuidv4 },
-  courseId: { type: String, ref: "Navbar", required: true, index: true },
+  courseId: { type: String, ref: "CourseCategory", required: true, index: true },
   title: { type: String, required: true, trim: true },
   startDate: { type: Date, required: true },
   durationDays: { type: Number, required: true },
