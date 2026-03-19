@@ -124,7 +124,7 @@ exports.updateGallery = async (req, res) => {
     if (!existing) return res.status(404).json({ message: "Album not found" });
 
     if (albumName) existing.albumName = albumName;
-    
+
     await existing.save();
     res.status(200).json({ message: "Album updated successfully", data: existing });
   } catch (err) {
@@ -149,16 +149,16 @@ exports.addGalleryImages = async (req, res) => {
     // Move files to album-specific folder if needed, but for now we use the unique suffix from multer
     // The user requested uploads/<albumName>/filename structure.
     // We can rename/move them now.
-    
+
     const newImages = req.files.map(file => {
       const filename = file.filename;
       const albumDir = path.join("uploads", existing.albumName);
       if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
-      
+
       const oldPath = file.path;
       const newPath = path.join(albumDir, filename);
       fs.renameSync(oldPath, newPath);
-      
+
       return getFullUrl(`uploads/${existing.albumName}/${filename}`);
     });
 
@@ -181,16 +181,16 @@ exports.deleteGalleryImage = async (req, res) => {
     if (!req.body || !req.body.imageUrl) {
       return res.status(400).json({ message: "Image URL is required for deletion" });
     }
-    const { imageUrl } = req.body; 
+    const { imageUrl } = req.body;
 
     const existing = await Gallery.findById(id);
     if (!existing) return res.status(404).json({ message: "Album not found" });
 
     // Remove from array (db stores absolute or relative? My getter does absolute)
     // We should find the matching path in the array
-    const imagePath = imageUrl; 
+    const imagePath = imageUrl;
     existing.images = existing.images.filter(img => img !== imagePath);
-    
+
     // Delete physical file
     try {
       // Extract relative path from URL
@@ -357,7 +357,7 @@ exports.replyToEnquiry = async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
-    
+
     enquiry.isReply = true;
     enquiry.isRead = true;
     await enquiry.save();
@@ -404,7 +404,7 @@ exports.createEnquiry = async (req, res) => {
       return res.status(400).json({ error: "CAPTCHA verification is required" });
     }
 
-    const secretKey = "6LfR8o8sAAAAAKyXa79rZrfaPiqEp3xhnc8LPG51";
+    const secretKey = "6Lc_DJAsAAAAAJ9YR4Z2typnfOHeIjF30l-Lse5B";
     const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${captchaToken}`;
 
     const response = await fetch(verificationUrl, { method: 'POST' });
@@ -824,7 +824,7 @@ exports.createRegistration = async (req, res) => {
     }
 
     console.log("Registration request received for courseId:", courseId);
-    
+
     let course = await CourseCategory.findById(courseId);
     if (!course) {
       console.log("Course not found in CourseCategory, checking Course model...");
@@ -835,7 +835,7 @@ exports.createRegistration = async (req, res) => {
       console.error("Selected course/category not found in DB for ID:", courseId);
       return res.status(404).json({ message: "Selected course not found" });
     }
-    
+
     console.log("Course/Category found:", course.categoryName || course.title);
 
     const registration = await Registration.create({
@@ -904,7 +904,7 @@ exports.createRegistration = async (req, res) => {
     transporter.sendMail(userReply)
       .then(() => console.log("Success: Student confirmation email sent"))
       .catch(err => console.error("Reg user mail failed:", err.message));
-      
+
     transporter.sendMail(adminNotif)
       .then(() => console.log("Success: Admin notification email sent"))
       .catch(err => console.error("Reg admin mail failed:", err.message));
@@ -931,7 +931,7 @@ exports.getRegistrations = async (req, res) => {
     const formatted = await Promise.all(registrations.map(async (r) => {
       const robj = r.toObject();
       let courseName = "Unknown";
-      
+
       if (robj.courseId) {
         if (typeof robj.courseId === 'object') {
           courseName = robj.courseId.categoryName || robj.courseId.title || "Unknown";
@@ -1292,9 +1292,9 @@ exports.updateBlog = async (req, res) => {
     // ✅ Handle slug if title changes
     if (req.body.title) {
       let newSlug = slugify(req.body.title, { lower: true, strict: true });
-      const existingSlug = await Blog.findOne({ 
-        slug: newSlug, 
-        _id: { $ne: id } 
+      const existingSlug = await Blog.findOne({
+        slug: newSlug,
+        _id: { $ne: id }
       });
       if (existingSlug) newSlug = `${newSlug}-${Date.now()}`;
       updateData.slug = newSlug;
