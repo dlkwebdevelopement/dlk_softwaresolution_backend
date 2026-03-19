@@ -242,7 +242,7 @@ exports.updateCategory = async (req, res) => {
       updateData.slug = slugify(categoryName, { lower: true, strict: true });
     }
 
-    const updated = await CourseCategory.findByIdAndUpdate(id, updateData, { new: true });
+    const updated = await CourseCategory.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 
     res.status(200).json({
       message: "Category updated successfully",
@@ -321,7 +321,7 @@ exports.getCategoriesWithSubs = async (req, res) => {
 exports.markEnquiryRead = async (req, res) => {
   try {
     const { id } = req.params;
-    const enquiry = await Enquiry.findByIdAndUpdate(id, { isRead: true }, { new: true });
+    const enquiry = await Enquiry.findByIdAndUpdate(id, { isRead: true }, { returnDocument: 'after' });
     if (!enquiry) return res.status(404).json({ message: "Enquiry not found" });
     res.status(200).json({ message: "Enquiry marked as read", data: enquiry });
   } catch (err) {
@@ -735,7 +735,7 @@ exports.updateQuestion = async (req, res) => {
 
     const updatedQuestion = await Question.findByIdAndUpdate(id, {
       question,
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     if (!updatedQuestion) {
       return res.status(404).json({ message: "Question not found" });
@@ -776,7 +776,7 @@ exports.updateAnswer = async (req, res) => {
 
     const updatedAnswer = await Answer.findByIdAndUpdate(id, {
       answer,
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     if (!updatedAnswer) {
       return res.status(404).json({ message: "Answer not found" });
@@ -1114,7 +1114,7 @@ exports.updateLiveClass = async (req, res) => {
 
     const updated = await LiveClass.findByIdAndUpdate(id, {
       ...req.body,
-    }, { new: true });
+    }, { returnDocument: 'after' });
 
     if (!updated) {
       return res.status(404).json({ message: "Live class not found" });
@@ -1216,7 +1216,7 @@ exports.getAllBlogs = async (req, res) => {
 
     const total = await Blog.countDocuments();
     const results = await Blog.find()
-      .select("_id title slug short_description image createdAt")
+      .select("_id title slug short_description image createdAt views")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -1247,7 +1247,11 @@ exports.getBlogBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const blog = await Blog.findOne({ slug });
+    const blog = await Blog.findOneAndUpdate(
+      { slug },
+      { $inc: { views: 1 } },
+      { returnDocument: 'after' }
+    );
 
     if (!blog) {
       return res.status(404).json({
@@ -1331,7 +1335,7 @@ exports.updateBlog = async (req, res) => {
         (updateData[key] === "" && delete updateData[key]),
     );
 
-    const updated = await Blog.findByIdAndUpdate(id, updateData, { new: true });
+    const updated = await Blog.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 
     if (!updated)
       return res
@@ -1489,7 +1493,7 @@ exports.updateTestimonial = async (req, res) => {
     const updated = await Testimonial.findByIdAndUpdate(
       req.params.id,
       updatedData,
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     res.json({

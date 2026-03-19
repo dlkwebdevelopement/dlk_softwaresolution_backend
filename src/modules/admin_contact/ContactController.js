@@ -207,7 +207,7 @@ exports.markAsRead = async (req, res) => {
     const contact = await Contact.findByIdAndUpdate(
       id,
       { isRead: true },
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!contact) {

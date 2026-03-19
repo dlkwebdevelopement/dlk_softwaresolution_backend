@@ -10,6 +10,7 @@ const blogSchema = new mongoose.Schema({
   short_description: { type: String, required: true, trim: true },
   description: { type: String, required: true, trim: true },
   image: { type: String, required: true, trim: true, get: getFullUrl },
+  views: { type: Number, default: 0 },
 }, { 
   timestamps: true,
   toJSON: { virtuals: true, getters: true },
