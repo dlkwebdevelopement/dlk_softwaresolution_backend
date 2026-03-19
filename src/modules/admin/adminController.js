@@ -394,10 +394,24 @@ exports.getEnquiries = async (req, res) => {
 // ✅ Create a new enquiry
 exports.createEnquiry = async (req, res) => {
   try {
-    const { name, email, mobile, course, location, timeslot } = req.body;
+    const { name, email, mobile, course, location, timeslot, captchaToken } = req.body;
 
     if (!name || !email || !mobile || !course || !location || !timeslot) {
       return res.status(400).json({ error: "All fields are required" });
+    }
+
+    if (!captchaToken) {
+      return res.status(400).json({ error: "CAPTCHA verification is required" });
+    }
+
+    const secretKey = "6LfR8o8sAAAAAKyXa79rZrfaPiqEp3xhnc8LPG51";
+    const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${captchaToken}`;
+
+    const response = await fetch(verificationUrl, { method: 'POST' });
+    const data = await response.json();
+
+    if (!data.success) {
+      return res.status(400).json({ error: "Failed CAPTCHA verification. Please try again." });
     }
 
     // 1️⃣ Save to DB
