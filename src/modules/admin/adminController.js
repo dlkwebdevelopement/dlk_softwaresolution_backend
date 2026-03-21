@@ -17,6 +17,8 @@ const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
 const transporter = require("../../utils/mailsender");
 const mongoose = require("mongoose");
+const Video = require("../../models/admin_home/Video");
+const Skill = require("../../models/admin_home/Skill");
 const { getFullUrl } = require("../../utils/urlHelper");
 const { getIO } = require("../../utils/socket");
 
@@ -1519,5 +1521,193 @@ exports.deleteTestimonial = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+/**
+ * CREATE Video
+ * POST /api/videos
+ */
+exports.createVideo = async (req, res) => {
+  try {
+    const { title, link, category, duration, thumbnail } = req.body;
+
+    if (!title || !link || !category) {
+      return res.status(400).json({ success: false, message: "Title, Link, and Category are required" });
+    }
+
+    const video = await Video.create({
+      title,
+      link,
+      category,
+      duration,
+      thumbnail
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Video created successfully",
+      data: video
+    });
+  } catch (error) {
+    console.error("Create Video Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * GET All Videos
+ * GET /api/videos
+ */
+exports.getAllVideos = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 20;
+    const skip = (page - 1) * limit;
+
+    const total = await Video.countDocuments();
+    const results = await Video.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    return res.status(200).json({
+      success: true,
+      message: "Videos fetched successfully",
+      data: {
+        current_page: page,
+        data: results,
+        total: total
+      }
+    });
+  } catch (error) {
+    console.error("Get Videos Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * UPDATE Video
+ * PUT /api/videos/:id
+ */
+exports.updateVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await Video.findByIdAndUpdate(id, req.body, { returnDocument: 'after' });
+
+    if (!updated) {
+      return res.status(404).json({ success: false, message: "Video not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Video updated successfully",
+      data: updated
+    });
+  } catch (error) {
+    console.error("Update Video Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+/**
+ * DELETE Video
+ * DELETE /api/videos/:id
+ */
+exports.deleteVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Video.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Video not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Video deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete Video Error:", error);
+    return res.status(500).json({ success: false, message: "Internal server error" });
+  }
+}
+
+/**
+ * ==========================================
+ *               SKILLS CRUD 
+ * ==========================================
+ */
+
+// 1. Create Skill
+exports.createSkill = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: "Skill name is required" });
+
+    const newSkill = await Skill.create({
+      name,
+      icon: req.file ? getFullUrl(`uploads/${req.file.filename}`) : null
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Skill created successfully",
+      data: newSkill
+    });
+  } catch (error) {
+    console.error("Create Skill Error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 2. Get All Skills
+exports.getAllSkills = async (req, res) => {
+  try {
+    const data = await Skill.find().sort({ createdAt: -1 });
+    return res.status(200).json(data);
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 3. Update Skill
+exports.updateSkill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+
+    const skill = await Skill.findById(id);
+    if (!skill) return res.status(404).json({ success: false, message: "Skill not found" });
+
+    if (name) skill.name = name;
+    if (req.file) skill.icon = getFullUrl(`uploads/${req.file.filename}`);
+
+    const updated = await skill.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Skill updated successfully",
+      data: updated
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 4. Delete Skill
+exports.deleteSkill = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await Skill.findByIdAndDelete(id);
+
+    if (!deleted) return res.status(404).json({ success: false, message: "Skill not found" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Skill deleted successfully"
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

@@ -21,6 +21,7 @@ const courseSchema = new mongoose.Schema({
   original_price: { type: Number },
   discount_percentage: { type: Number },
   syllabus_pdf: { type: String, trim: true },
+  skills: [{ type: String, ref: "Skill" }],
 }, { 
   timestamps: true,
   toJSON: { virtuals: true, getters: true },

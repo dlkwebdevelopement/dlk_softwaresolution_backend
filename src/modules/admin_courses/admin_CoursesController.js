@@ -3,6 +3,7 @@ const CourseWhoShouldEnroll = require("../../models/admin_courses/CourseWhoShoul
 const CourseLearningPoint = require("../../models/admin_courses/CourseLearningPoint");
 const CourseCurriculum = require("../../models/admin_courses/CourseCurriculum");
 const CourseReview = require("../../models/admin_courses/CourseReview");
+const Skill = require("../../models/admin_home/Skill");
 const slugify = require("slugify");
 const mongoose = require("mongoose");
 const { getFullUrl } = require("../../utils/urlHelper");
@@ -17,6 +18,10 @@ exports.getCourseBySlug = async (req, res) => {
       .populate({
         path: "category_id",
         model: "CourseCategory"
+      })
+      .populate({
+        path: "skills",
+        model: "Skill"
       });
 
     if (!course) {
@@ -65,8 +70,12 @@ exports.createCourse = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { whoShouldEnroll, learningPoints, curriculum, ...courseData } =
+    const { whoShouldEnroll, learningPoints, curriculum, skills, ...courseData } =
       req.body;
+      
+    if (skills) {
+      courseData.skills = safeParse(skills);
+    }
 
     if (!courseData.title) {
       return res.status(400).json({
@@ -212,8 +221,12 @@ exports.updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { whoShouldEnroll, learningPoints, curriculum, ...courseData } =
+    const { whoShouldEnroll, learningPoints, curriculum, skills, ...courseData } =
       req.body;
+
+    if (typeof skills !== "undefined") {
+      courseData.skills = safeParse(skills);
+    }
 
     const course = await Course.findById(id).session(session);
 

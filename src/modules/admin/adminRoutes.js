@@ -53,6 +53,14 @@ const {
   updateGallery,
   addGalleryImages,
   deleteGalleryImage,
+  createVideo,
+  getAllVideos,
+  updateVideo,
+  deleteVideo,
+  createSkill,
+  getAllSkills,
+  updateSkill,
+  deleteSkill,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -134,5 +142,17 @@ router.get("/gallery", getGallery);
 router.patch("/gallery/:id", updateGallery);
 router.post("/gallery/:id/images", upload.array("images"), addGalleryImages);
 router.delete("/gallery/:id/image", deleteGalleryImage);
+
+// ✅ Video Routes
+router.get("/videos", getAllVideos);
+router.post("/videos", createVideo);
+router.put("/videos/:id", updateVideo);
+router.delete("/videos/:id", deleteVideo);
+
+// ✅ Skill Routes
+router.get("/skills", getAllSkills);
+router.post("/skills", upload.single("icon"), createSkill);
+router.put("/skills/:id", upload.single("icon"), updateSkill);
+router.delete("/skills/:id", deleteSkill);
 
 module.exports = router;
