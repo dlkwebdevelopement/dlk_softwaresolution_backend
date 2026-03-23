@@ -850,22 +850,46 @@ exports.createRegistration = async (req, res) => {
 
     const courseName = course.categoryName || course.category || course.title;
 
+    console.log("PDF URL Trace:", course?.syllabus_pdf_url);
+    console.log("Inquiry Type Target:", inquiryType);
+
+    require('fs').appendFileSync('C:/Users/DLK Groups/.gemini/antigravity/brain/5210e525-f24a-4c35-8d8a-4ac0e3bfa6cc/debug_pdf.txt', `Syllabus_pdf: ${course?.syllabus_pdf}\nInquiry Type: ${inquiryType}\nDate: ${new Date().toISOString()}\n----------\n`);
+
+    const isCurriculumRequest = inquiryType?.toLowerCase().includes("curriculum download");
+    console.log("isCurriculumRequest Condition:", isCurriculumRequest);
+
     // 📩 User Auto-Reply
     const userReply = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Registration Successful - DLK Software Solutions",
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #3DB843;">Hello ${fullName},</h2>
-          <p>You have successfully registered for our <strong>${courseName}</strong> course. We're excited to have you on board!</p>
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Inquiry Type:</strong> ${inquiryType || 'General Registration'}</p>
+      subject: isCurriculumRequest 
+        ? `Your Curriculum PDF - ${courseName}` 
+        : "Registration Successful - DLK Software Solutions",
+      html: isCurriculumRequest
+        ? `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #10b981;">Hello,</h2>
+            <p>Thank you for your interest in our <strong>${courseName}</strong> course. Please find the curriculum PDF attached to this email.</p>
+            <p>Best Regards,<br/><strong>The DLK Academy Team</strong></p>
           </div>
-          <p>Our training advisors will reach out to you shortly with more details.</p>
-          <p>Best Regards,<br/><strong>The DLK Academy Team</strong></p>
-        </div>
-      `,
+        `
+        : `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #3DB843;">Hello ${fullName},</h2>
+            <p>You have successfully registered for our <strong>${courseName}</strong> course. We're excited to have you on board!</p>
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Inquiry Type:</strong> ${inquiryType || 'General Registration'}</p>
+            </div>
+            <p>Our training advisors will reach out to you shortly with more details.</p>
+            <p>Best Regards,<br/><strong>The DLK Academy Team</strong></p>
+          </div>
+        `,
+      attachments: (isCurriculumRequest && course?.syllabus_pdf) ? [
+        {
+          filename: `${courseName.replace(/\s+/g, '_')}_Curriculum.pdf`,
+          path: course.syllabus_pdf
+        }
+      ] : []
     };
 
     // 📩 Admin Notification
