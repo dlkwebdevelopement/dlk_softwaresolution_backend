@@ -850,13 +850,7 @@ exports.createRegistration = async (req, res) => {
 
     const courseName = course.categoryName || course.category || course.title;
 
-    console.log("PDF URL Trace:", course?.syllabus_pdf_url);
-    console.log("Inquiry Type Target:", inquiryType);
-
-    require('fs').appendFileSync('C:/Users/DLK Groups/.gemini/antigravity/brain/5210e525-f24a-4c35-8d8a-4ac0e3bfa6cc/debug_pdf.txt', `Syllabus_pdf: ${course?.syllabus_pdf}\nInquiry Type: ${inquiryType}\nDate: ${new Date().toISOString()}\n----------\n`);
-
     const isCurriculumRequest = inquiryType?.toLowerCase().includes("curriculum download");
-    console.log("isCurriculumRequest Condition:", isCurriculumRequest);
 
     // 📩 User Auto-Reply
     const userReply = {
