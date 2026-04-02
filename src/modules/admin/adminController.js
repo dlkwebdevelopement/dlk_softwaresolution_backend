@@ -11,6 +11,7 @@ const LiveClass = require("../../models/admin_home/LiveClass");
 const fs = require("fs");
 const path = require("path");
 const Blog = require("../../models/admin_home/Blog");
+const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
@@ -617,6 +618,108 @@ exports.deleteBanner = async (req, res) => {
     res.json({ message: "Banner deleted successfully" });
   } catch (err) {
     console.error("Error deleting banner:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Upload offer
+exports.uploadOffer = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file uploaded" });
+    }
+
+    const { title } = req.body;
+    if (!title) {
+      return res.status(400).json({ message: "Offer title is required" });
+    }
+
+    const offer = await Offer.create({
+      title,
+      photoUrl: getFullUrl(`uploads/${req.file.filename}`),
+    });
+
+    res.status(201).json({
+      message: "Offer created successfully",
+      offer,
+    });
+  } catch (err) {
+    console.error("UPLOAD OFFER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get all offers
+exports.getOffers = async (req, res) => {
+  try {
+    const offers = await Offer.find().sort({ createdAt: -1 });
+    res.status(200).json(offers || []);
+  } catch (err) {
+    console.error("GET OFFERS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch offers" });
+  }
+};
+
+// ✅ Update offer
+exports.updateOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    const existing = await Offer.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Offer not found" });
+    }
+
+    let photoUrl = existing.photoUrl;
+
+    if (req.file) {
+      // Delete old photo
+      const oldFileName = path.basename(existing.photoUrl);
+      const oldPath = path.join(__dirname, "../../../uploads", oldFileName);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+      photoUrl = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    existing.title = title ?? existing.title;
+    existing.photoUrl = photoUrl;
+
+    await existing.save();
+
+    res.status(200).json({
+      message: "Offer updated successfully",
+      offer: existing,
+    });
+  } catch (err) {
+    console.error("UPDATE OFFER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Delete offer
+exports.deleteOffer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const offer = await Offer.findById(id);
+    if (!offer) {
+      return res.status(404).json({ message: "Offer not found" });
+    }
+
+    // Delete photo file
+    const fileName = path.basename(offer.photoUrl);
+    const photoPath = path.join(__dirname, "../../../uploads", fileName);
+    if (fs.existsSync(photoPath)) {
+      fs.unlinkSync(photoPath);
+    }
+
+    await Offer.findByIdAndDelete(id);
+
+    res.json({ message: "Offer deleted successfully" });
+  } catch (err) {
+    console.error("DELETE OFFER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -1231,7 +1334,7 @@ exports.createBlog = async (req, res) => {
 exports.getAllBlogs = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 10;
+    const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
     const total = await Blog.countDocuments();

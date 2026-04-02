@@ -13,6 +13,10 @@ const {
   updateBanner,
   getBanners,
   deleteBanner,
+  uploadOffer,
+  getOffers,
+  updateOffer,
+  deleteOffer,
   uploadCompany,
   getCompanies,
   deleteCompany,
@@ -85,6 +89,12 @@ router.post("/upload-banner", upload.single("photo"), uploadBanner);
 router.get("/banners", getBanners);
 router.put("/banner/:id", upload.single("photo"), updateBanner);
 router.delete("/banner/:id", deleteBanner);
+
+// ✅ Offer Routes
+router.post("/offers", upload.single("photo"), uploadOffer);
+router.get("/offers", getOffers);
+router.put("/offers/:id", upload.single("photo"), updateOffer);
+router.delete("/offers/:id", deleteOffer);
 
 // ✅ Company Upload, Get & Delete
 router.post("/upload-company", upload.single("photo"), uploadCompany);
