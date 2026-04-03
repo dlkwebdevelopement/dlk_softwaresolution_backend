@@ -48,6 +48,11 @@ const {
   getBlogBySlug,
   updateBlog,
   deleteBlog,
+  createStudentProject,
+  getAllStudentProjects,
+  getStudentProjectBySlug,
+  updateStudentProject,
+  deleteStudentProject,
   getAllTestimonials,
   getTestimonial,
   createTestimonial,
@@ -65,6 +70,12 @@ const {
   getAllSkills,
   updateSkill,
   deleteSkill,
+  getPlacements,
+  uploadPlacement,
+  updatePlacement,
+  deletePlacement,
+  togglePlacementActive,
+  reorderPlacements,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -129,16 +140,19 @@ router.delete("/liveclass/:id", deleteLiveClass);
 // 📝 Blogs
 // ===============================
 
-// Create Blog (with image upload)
+// ✅ Blog Routes
 router.post("/blogs", upload.single("image"), createBlog);
-
-// Update Blog (optional image update)
-router.put("/blogs/:id", upload.single("image"), updateBlog);
-
 router.get("/blogs", getAllBlogs);
 router.get("/blogs/:slug", getBlogBySlug);
+router.put("/blogs/:id", upload.single("image"), updateBlog);
 router.delete("/blogs/:id", deleteBlog);
 
+// ✅ Student Projects Routes
+router.post("/student-projects", upload.single("image"), createStudentProject);
+router.get("/student-projects", getAllStudentProjects);
+router.get("/student-projects/:slug", getStudentProjectBySlug);
+router.put("/student-projects/:id", upload.single("image"), updateStudentProject);
+router.delete("/student-projects/:id", deleteStudentProject);
 
 //testimonial
 router.get("/testimonial", getAllTestimonials);
@@ -164,5 +178,13 @@ router.get("/skills", getAllSkills);
 router.post("/skills", upload.single("icon"), createSkill);
 router.put("/skills/:id", upload.single("icon"), updateSkill);
 router.delete("/skills/:id", deleteSkill);
+
+// ✅ Placement Routes
+router.get("/placements", getPlacements);
+router.post("/placements", upload.single("image"), uploadPlacement);
+router.put("/placements/reorder", reorderPlacements);
+router.put("/placements/:id", upload.single("image"), updatePlacement);
+router.delete("/placements/:id", deletePlacement);
+router.patch("/placements/:id/toggle", togglePlacementActive);
 
 module.exports = router;

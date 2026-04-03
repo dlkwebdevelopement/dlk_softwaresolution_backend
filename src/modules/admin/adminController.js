@@ -11,6 +11,7 @@ const LiveClass = require("../../models/admin_home/LiveClass");
 const fs = require("fs");
 const path = require("path");
 const Blog = require("../../models/admin_home/Blog");
+const StudentProject = require("../../models/admin_home/StudentProject");
 const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
 const slugify = require("slugify");
@@ -20,6 +21,7 @@ const transporter = require("../../utils/mailsender");
 const mongoose = require("mongoose");
 const Video = require("../../models/admin_home/Video");
 const Skill = require("../../models/admin_home/Skill");
+const Placement = require("../../models/admin_home/Placement");
 const { getFullUrl } = require("../../utils/urlHelper");
 const { getIO } = require("../../utils/socket");
 
@@ -1509,6 +1511,228 @@ exports.deleteBlog = async (req, res) => {
   }
 };
 
+/* =========================================================
+   STUDENT PROJECTS CRUD CONTROLLERS
+========================================================= */
+
+/**
+ * CREATE Student Project
+ * POST /api/student-projects
+ */
+exports.createStudentProject = async (req, res) => {
+  try {
+    const { title, short_description, description } = req.body;
+
+    if (!title || !short_description || !description || !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "All required fields including image must be provided",
+      });
+    }
+
+    const cleanDescription = sanitizeHtml(description, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+      allowedAttributes: {
+        a: ["href", "name", "target"],
+        img: ["src", "alt"],
+        "*": ["style"],
+      },
+    });
+
+    let slug = slugify(title, { lower: true, strict: true });
+    const existingSlug = await StudentProject.findOne({ slug });
+    if (existingSlug) {
+      slug = `${slug}-${Date.now()}`;
+    }
+
+    const project = await StudentProject.create({
+      title,
+      slug,
+      short_description,
+      description: cleanDescription,
+      image: getFullUrl(`uploads/${req.file.filename}`),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Student Project created successfully",
+      data: project,
+    });
+  } catch (error) {
+    console.error("Create Student Project Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * GET All Student Projects (Card Data)
+ * GET /api/student-projects
+ */
+exports.getAllStudentProjects = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const total = await StudentProject.countDocuments();
+    const results = await StudentProject.find()
+      .select("_id title slug short_description image createdAt views")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    return res.status(200).json({
+      success: true,
+      message: "Student Projects fetched successfully",
+      data: {
+        current_page: page,
+        data: results,
+        total: total,
+      },
+    });
+  } catch (error) {
+    console.error("Get Student Projects Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * GET Student Project By Slug
+ * GET /api/student-projects/:slug
+ */
+exports.getStudentProjectBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const project = await StudentProject.findOneAndUpdate(
+      { slug },
+      { $inc: { views: 1 } },
+      { returnDocument: 'after' }
+    );
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Student Project not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Student Project details fetched successfully",
+      data: project,
+    });
+  } catch (error) {
+    console.error("Get Student Project Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * UPDATE Student Project
+ * PUT /api/student-projects/:id
+ */
+exports.updateStudentProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    let updateData = { ...req.body };
+
+    if (req.body.title) {
+      let newSlug = slugify(req.body.title, { lower: true, strict: true });
+      const existingSlug = await StudentProject.findOne({
+        slug: newSlug,
+        _id: { $ne: id }
+      });
+      if (existingSlug) newSlug = `${newSlug}-${Date.now()}`;
+      updateData.slug = newSlug;
+    }
+
+    if (req.body.description) {
+      updateData.description = sanitizeHtml(req.body.description, {
+        allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img"]),
+        allowedAttributes: {
+          a: ["href", "name", "target"],
+          img: ["src", "alt"],
+          "*": ["style"],
+        },
+      });
+    }
+
+    if (req.file) {
+      updateData.image = getFullUrl(`uploads/${req.file.filename}`);
+      const oldProject = await StudentProject.findById(id);
+      if (oldProject?.image) {
+        const oldImagePath = path.join(__dirname, "../../", oldProject.image);
+        if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
+      }
+    } else if (req.body.existingImage) {
+      updateData.image = req.body.existingImage;
+      delete updateData.existingImage;
+    }
+
+    Object.keys(updateData).forEach(
+      (key) =>
+        updateData[key] == null ||
+        (updateData[key] === "" && delete updateData[key]),
+    );
+
+    const updated = await StudentProject.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
+
+    if (!updated)
+      return res.status(404).json({ success: false, message: "Student Project not found" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Student Project updated successfully",
+      data: updated,
+    });
+  } catch (error) {
+    console.error("Update Student Project Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+/**
+ * DELETE Student Project
+ * DELETE /api/student-projects/:id
+ */
+exports.deleteStudentProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedRows = await StudentProject.findByIdAndDelete(id);
+
+    if (!deletedRows) {
+      return res.status(404).json({
+        success: false,
+        message: "Student Project not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Student Project deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete Student Project Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
 /**
  * GET ALL ACTIVE TESTIMONIALS
  */
@@ -1830,5 +2054,151 @@ exports.deleteSkill = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+/* =========================
+   PLACEMENT CRUD
+========================= */
+
+// ✅ Get all placements
+exports.getPlacements = async (req, res) => {
+  try {
+    const placements = await Placement.find().sort({ displayOrder: 1, createdAt: -1 });
+    res.status(200).json(placements || []);
+  } catch (err) {
+    console.error("GET PLACEMENTS ERROR:", err);
+    res.status(500).json({ error: "Failed to fetch placements" });
+  }
+};
+
+// ✅ Upload new placement
+exports.uploadPlacement = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No placement image uploaded" });
+    }
+
+    const { isActive, displayOrder } = req.body;
+
+    // Convert string "true"/"false" from FormData to Boolean
+    const isActiveBool = isActive === 'true' || isActive === true;
+
+    const placement = await Placement.create({
+      photoUrl: getFullUrl(`uploads/${req.file.filename}`),
+      isActive: isActiveBool,
+      displayOrder: displayOrder || 0,
+    });
+
+    res.status(201).json({
+      message: "Placement created successfully",
+      placement,
+    });
+  } catch (err) {
+    console.error("UPLOAD PLACEMENT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Update placement
+exports.updatePlacement = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive, displayOrder } = req.body;
+
+    const existing = await Placement.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Placement not found" });
+    }
+
+    let photoUrl = existing.photoUrl;
+    if (req.file) {
+      // Delete old photo
+      const oldFileName = path.basename(existing.photoUrl);
+      const oldPath = path.join(__dirname, "../../../uploads", oldFileName);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+      }
+      photoUrl = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    const isActiveBool = isActive !== undefined ? (isActive === 'true' || isActive === true) : existing.isActive;
+
+    existing.isActive = isActiveBool;
+    existing.displayOrder = displayOrder ?? existing.displayOrder;
+    existing.photoUrl = photoUrl;
+
+    await existing.save();
+
+    res.status(200).json({
+      message: "Placement updated successfully",
+      placement: existing,
+    });
+  } catch (err) {
+    console.error("UPDATE PLACEMENT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Toggle placement status
+exports.togglePlacementActive = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await Placement.findById(id);
+    if (!existing) return res.status(404).json({ message: "Placement not found" });
+
+    existing.isActive = !existing.isActive;
+    await existing.save();
+
+    res.status(200).json({ message: "Status toggled", data: existing });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Delete placement
+exports.deletePlacement = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const placement = await Placement.findById(id);
+    if (!placement) {
+      return res.status(404).json({ message: "Placement not found" });
+    }
+
+    // Delete photo file
+    const fileName = path.basename(placement.photoUrl);
+    const photoPath = path.join(__dirname, "../../../uploads", fileName);
+    if (fs.existsSync(photoPath)) {
+      fs.unlinkSync(photoPath);
+    }
+
+    await Placement.findByIdAndDelete(id);
+
+    res.json({ message: "Placement deleted successfully" });
+  } catch (err) {
+    console.error("DELETE PLACEMENT ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Reorder placements
+exports.reorderPlacements = async (req, res) => {
+  try {
+    const { orders } = req.body; // Array of {id, displayOrder}
+
+    if (!orders || !Array.isArray(orders)) {
+      return res.status(400).json({ message: "Orders array is required" });
+    }
+
+    const updatePromises = orders.map(item => 
+      Placement.findByIdAndUpdate(item.id, { displayOrder: item.displayOrder })
+    );
+
+    await Promise.all(updatePromises);
+
+    res.status(200).json({ message: "Placements reordered successfully" });
+  } catch (err) {
+    console.error("REORDER PLACEMENT ERROR:", err);
+    res.status(500).json({ error: err.message });
   }
 };
