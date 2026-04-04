@@ -9,15 +9,8 @@ const gallerySchema = new mongoose.Schema({
     type: String, 
     required: true, 
     trim: true,
-    enum: [
-      'Workshop', 
-      'Training', 
-      'Project', 
-      'Internship', 
-      'Project discussion', 
-      'Certification'
-    ]
   },
+  thumbnail: { type: String, trim: true, get: getFullUrl },
   images: [{ type: String, trim: true, get: getFullUrl }],
 }, { 
   timestamps: true,

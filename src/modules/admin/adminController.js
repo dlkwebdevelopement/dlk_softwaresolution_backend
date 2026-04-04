@@ -14,6 +14,7 @@ const Blog = require("../../models/admin_home/Blog");
 const StudentProject = require("../../models/admin_home/StudentProject");
 const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
+const GalleryEvent = require("../../models/admin_home/GalleryEvent");
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
@@ -178,6 +179,83 @@ exports.addGalleryImages = async (req, res) => {
 };
 
 /* =========================
+   CREATE GALLERY ALBUM
+========================= */
+exports.createGalleryAlbum = async (req, res) => {
+  try {
+    const { albumName } = req.body;
+    if (!albumName) return res.status(400).json({ message: "Album name is required" });
+
+    let thumbnail = "";
+    if (req.file) {
+      thumbnail = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    const album = await Gallery.create({ albumName, thumbnail });
+    res.status(201).json({ message: "Album created successfully", data: album });
+  } catch (err) {
+    console.error("CREATE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteGalleryAlbum = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ message: "Album not found" });
+
+    // Delete thumbnail if exists
+    if (album.thumbnail) {
+      const thumbPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
+      if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+    }
+
+    // Delete all images in album folder
+    const albumDir = path.join(process.cwd(), "uploads", album.albumName);
+    if (fs.existsSync(albumDir)) {
+      fs.rmSync(albumDir, { recursive: true, force: true });
+    }
+
+    await Gallery.findByIdAndDelete(id);
+    res.status(200).json({ message: "Album and all its images deleted successfully" });
+  } catch (err) {
+    console.error("DELETE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updateGalleryAlbum = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { albumName } = req.body;
+    
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ message: "Album not found" });
+
+    let thumbnail = album.thumbnail;
+    if (req.file) {
+      // Delete old thumbnail
+      if (album.thumbnail) {
+        const oldPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      thumbnail = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    const updatedAlbum = await Gallery.findByIdAndUpdate(id, {
+      albumName: albumName || album.albumName,
+      thumbnail
+    }, { new: true });
+
+    res.status(200).json({ message: "Album updated successfully", data: updatedAlbum });
+  } catch (err) {
+    console.error("UPDATE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
    DELETE GALLERY IMAGE
 ========================= */
 exports.deleteGalleryImage = async (req, res) => {
@@ -191,14 +269,11 @@ exports.deleteGalleryImage = async (req, res) => {
     const existing = await Gallery.findById(id);
     if (!existing) return res.status(404).json({ message: "Album not found" });
 
-    // Remove from array (db stores absolute or relative? My getter does absolute)
-    // We should find the matching path in the array
-    const imagePath = imageUrl;
-    existing.images = existing.images.filter(img => img !== imagePath);
+    // Remove from array
+    existing.images = existing.images.filter(img => img !== imageUrl);
 
     // Delete physical file
     try {
-      // Extract relative path from URL
       const urlObj = new URL(imageUrl);
       const relativePath = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
       const physicalPath = path.join(process.cwd(), relativePath);
@@ -212,6 +287,139 @@ exports.deleteGalleryImage = async (req, res) => {
   } catch (err) {
     console.error("DELETE GALLERY IMAGE ERROR:", err);
     res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   GALLERY EVENT CRUD
+========================= */
+
+exports.createGalleryEvent = async (req, res) => {
+  try {
+    const { categoryId, title, eventDate, eventTime } = req.body;
+    if (!categoryId || !title || !eventDate || !eventTime) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    let mainImage = "";
+    if (req.files && req.files.mainImage) {
+      mainImage = `uploads/${req.files.mainImage[0].filename}`;
+    }
+
+    let galleryImages = [];
+    if (req.files && req.files.galleryImages) {
+      galleryImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
+    }
+
+    const newEvent = await GalleryEvent.create({
+      categoryId,
+      title,
+      mainImage,
+      galleryImages,
+      eventDate,
+      eventTime,
+    });
+
+    res.status(201).json({ success: true, message: "Gallery event created successfully", data: newEvent });
+  } catch (err) {
+    console.error("CREATE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAllGalleryEvents = async (req, res) => {
+  try {
+    const events = await GalleryEvent.find()
+      .populate("categoryId", "albumName")
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: events });
+  } catch (err) {
+    console.error("GET ALL GALLERY EVENTS ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteGalleryEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const event = await GalleryEvent.findById(id);
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+
+    // Physical deletion of main image
+    if (event.mainImage) {
+      const physicalPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
+      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+    }
+
+    // Physical deletion of gallery images
+    if (event.galleryImages && event.galleryImages.length > 0) {
+      event.galleryImages.forEach(img => {
+        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
+        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+      });
+    }
+
+    await GalleryEvent.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "Gallery event deleted successfully" });
+  } catch (err) {
+    console.error("DELETE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateGalleryEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { categoryId, title, eventDate, eventTime } = req.body;
+    
+    const event = await GalleryEvent.findById(id);
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+
+    let mainImage = event.mainImage;
+    if (req.files && req.files.mainImage) {
+      // Delete old main image
+      if (event.mainImage) {
+        const oldPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      mainImage = `uploads/${req.files.mainImage[0].filename}`;
+    }
+
+    let galleryImages = [...event.galleryImages];
+
+    // If keepImages is provided, compute what was removed and delete those files
+    if (req.body.keepImages !== undefined) {
+      let keepImages = [];
+      try { keepImages = JSON.parse(req.body.keepImages); } catch (e) { keepImages = galleryImages; }
+
+      // Physically delete removed images
+      const removed = galleryImages.filter(img => !keepImages.includes(img));
+      removed.forEach(img => {
+        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
+        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+      });
+      galleryImages = keepImages;
+    }
+
+    // Append any newly uploaded images
+    if (req.files && req.files.galleryImages) {
+      const newImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
+      galleryImages = [...galleryImages, ...newImages];
+    }
+
+    const updatedEvent = await GalleryEvent.findByIdAndUpdate(id, {
+      categoryId: categoryId || event.categoryId,
+      title: title || event.title,
+      eventDate: eventDate || event.eventDate,
+      eventTime: eventTime || event.eventTime,
+      mainImage,
+      galleryImages,
+    }, { new: true });
+
+    res.status(200).json({ success: true, message: "Gallery event updated successfully", data: updatedEvent });
+  } catch (err) {
+    console.error("UPDATE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 /* =========================

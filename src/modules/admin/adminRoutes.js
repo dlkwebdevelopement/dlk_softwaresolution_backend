@@ -59,23 +59,29 @@ const {
   updateTestimonial,
   deleteTestimonial,
   getGallery,
-  updateGallery,
+  createGalleryAlbum,
+  updateGalleryAlbum,
+  deleteGalleryAlbum,
   addGalleryImages,
   deleteGalleryImage,
   createVideo,
   getAllVideos,
   updateVideo,
   deleteVideo,
+  deleteSkill,
   createSkill,
   getAllSkills,
   updateSkill,
-  deleteSkill,
   getPlacements,
   uploadPlacement,
   updatePlacement,
   deletePlacement,
   togglePlacementActive,
   reorderPlacements,
+  createGalleryEvent,
+  getAllGalleryEvents,
+  deleteGalleryEvent,
+  updateGalleryEvent,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -163,8 +169,10 @@ router.delete("/testimonial/:id", deleteTestimonial);
 
 // ✅ Gallery Routes
 router.get("/gallery", getGallery);
-router.patch("/gallery/:id", updateGallery);
-router.post("/gallery/:id/images", upload.array("images"), addGalleryImages);
+router.post("/gallery", upload.single("thumbnail"), createGalleryAlbum);
+router.put("/gallery/:id", upload.single("thumbnail"), updateGalleryAlbum);
+router.delete("/gallery/:id", deleteGalleryAlbum);
+router.post("/gallery/:id/images", upload.array("images", 20), addGalleryImages);
 router.delete("/gallery/:id/image", deleteGalleryImage);
 
 // ✅ Video Routes
@@ -186,5 +194,17 @@ router.put("/placements/reorder", reorderPlacements);
 router.put("/placements/:id", upload.single("image"), updatePlacement);
 router.delete("/placements/:id", deletePlacement);
 router.patch("/placements/:id/toggle", togglePlacementActive);
+
+// ✅ Gallery Event Routes
+router.post("/gallery-events", upload.fields([
+  { name: 'mainImage', maxCount: 1 },
+  { name: 'galleryImages', maxCount: 20 }
+]), createGalleryEvent);
+router.get("/gallery-events", getAllGalleryEvents);
+router.put("/gallery-events/:id", upload.fields([
+  { name: 'mainImage', maxCount: 1 },
+  { name: 'galleryImages', maxCount: 20 }
+]), updateGalleryEvent);
+router.delete("/gallery-events/:id", deleteGalleryEvent);
 
 module.exports = router;
