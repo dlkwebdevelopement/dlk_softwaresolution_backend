@@ -6,6 +6,8 @@ const courseCurriculumSchema = new mongoose.Schema({
   course_id: { type: String, ref: "Course", required: true, index: true },
   title: { type: String, required: true, trim: true },
   lessons_info: { type: String, trim: true },
+  description: { type: String, trim: true },
+  link: { type: String, trim: true },
   order_index: { type: Number, default: 0 },
 }, { 
   timestamps: true,
