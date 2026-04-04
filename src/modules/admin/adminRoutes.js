@@ -82,6 +82,10 @@ const {
   getAllGalleryEvents,
   deleteGalleryEvent,
   updateGalleryEvent,
+  getAllWorkshops,
+  postWorkshop,
+  updateWorkshop,
+  deleteWorkshop,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -201,10 +205,13 @@ router.post("/gallery-events", upload.fields([
   { name: 'galleryImages', maxCount: 20 }
 ]), createGalleryEvent);
 router.get("/gallery-events", getAllGalleryEvents);
-router.put("/gallery-events/:id", upload.fields([
-  { name: 'mainImage', maxCount: 1 },
-  { name: 'galleryImages', maxCount: 20 }
-]), updateGalleryEvent);
-router.delete("/gallery-events/:id", deleteGalleryEvent);
+router.delete("/gallery-event/:id", deleteGalleryEvent);
+router.put("/gallery-event/:id", upload.fields([{ name: "mainImage", maxCount: 1 }, { name: "galleryImages", maxCount: 10 }]), updateGalleryEvent);
+
+// ✅ Workshops
+router.get("/workshops", getAllWorkshops);
+router.post("/workshops", upload.single("image"), postWorkshop);
+router.put("/workshops/:id", upload.single("image"), updateWorkshop);
+router.delete("/workshops/:id", deleteWorkshop);
 
 module.exports = router;

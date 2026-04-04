@@ -23,6 +23,7 @@ const mongoose = require("mongoose");
 const Video = require("../../models/admin_home/Video");
 const Skill = require("../../models/admin_home/Skill");
 const Placement = require("../../models/admin_home/Placement");
+const Workshop = require("../../models/admin_home/Workshop");
 const { getFullUrl } = require("../../utils/urlHelper");
 const { getIO } = require("../../utils/socket");
 
@@ -2408,5 +2409,81 @@ exports.reorderPlacements = async (req, res) => {
   } catch (err) {
     console.error("REORDER PLACEMENT ERROR:", err);
     res.status(500).json({ error: err.message });
+  }
+};
+
+/* =========================
+   WORKSHOP CRUD
+========================= */
+
+exports.getAllWorkshops = async (req, res) => {
+  try {
+    const workshops = await Workshop.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: workshops });
+  } catch (err) {
+    console.error("GET ALL WORKSHOPS ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.postWorkshop = async (req, res) => {
+  try {
+    const { title, duration, date, startTime, endTime, categoryName, expertName } = req.body;
+    let image = "";
+    if (req.file) {
+      image = `uploads/${req.file.filename}`;
+    }
+    const workshop = new Workshop({ title, image, duration, date, startTime, endTime, categoryName, expertName });
+    await workshop.save();
+    res.status(201).json({ success: true, message: "Workshop added successfully", data: workshop });
+  } catch (err) {
+    console.error("POST WORKSHOP ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateWorkshop = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, duration, date, startTime, endTime, categoryName, expertName } = req.body;
+    const workshop = await Workshop.findById(id);
+    if (!workshop) return res.status(404).json({ success: false, message: "Workshop not found" });
+
+    let image = workshop.image;
+    if (req.file) {
+      if (workshop.image) {
+        const oldPath = path.join(process.cwd(), "uploads", path.basename(workshop.image));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      image = `uploads/${req.file.filename}`;
+    }
+
+    const updated = await Workshop.findByIdAndUpdate(id, {
+      title, duration, date, startTime, endTime, categoryName, expertName, image
+    }, { new: true });
+
+    res.status(200).json({ success: true, message: "Workshop updated successfully", data: updated });
+  } catch (err) {
+    console.error("UPDATE WORKSHOP ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteWorkshop = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const workshop = await Workshop.findById(id);
+    if (!workshop) return res.status(404).json({ success: false, message: "Workshop not found" });
+
+    if (workshop.image) {
+      const physicalPath = path.join(process.cwd(), "uploads", path.basename(workshop.image));
+      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+    }
+
+    await Workshop.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "Workshop deleted successfully" });
+  } catch (err) {
+    console.error("DELETE WORKSHOP ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
