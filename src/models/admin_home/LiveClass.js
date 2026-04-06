@@ -9,6 +9,7 @@ const liveClassSchema = new mongoose.Schema({
   durationDays: { type: Number, required: true },
   startTime: { type: String, required: true, trim: true },
   endTime: { type: String, required: true, trim: true },
+  image: { type: String, default: "" },
   isActive: { type: Boolean, default: true },
 }, { 
   timestamps: { createdAt: "createdAt", updatedAt: "updatedAt" },

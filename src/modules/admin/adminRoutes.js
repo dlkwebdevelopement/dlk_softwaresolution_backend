@@ -140,10 +140,10 @@ router.post("/register/reply", replyToRegistration);
 router.delete("/register/:id", deleteRegistration);
 
 //for upcoming live classes
-router.post("/liveclass", createLiveClass);
+router.post("/liveclass", upload.single("image"), createLiveClass);
 router.get("/liveclass", getAllLiveClasses);
 router.get("/liveclass/:id", getLiveClassById);
-router.put("/liveclass/:id", updateLiveClass);
+router.put("/liveclass/:id", upload.single("image"), updateLiveClass);
 router.delete("/liveclass/:id", deleteLiveClass);
 
 // ===============================

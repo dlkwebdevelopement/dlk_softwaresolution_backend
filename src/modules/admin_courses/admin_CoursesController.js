@@ -3,7 +3,10 @@ const CourseWhoShouldEnroll = require("../../models/admin_courses/CourseWhoShoul
 const CourseLearningPoint = require("../../models/admin_courses/CourseLearningPoint");
 const CourseCurriculum = require("../../models/admin_courses/CourseCurriculum");
 const CourseReview = require("../../models/admin_courses/CourseReview");
+const CourseInclude = require("../../models/admin_courses/CourseInclude");
 const Skill = require("../../models/admin_home/Skill");
+const Enquiry = require("../../models/admin_home/Enquiry");
+const Registration = require("../../models/admin_home/Registration");
 const slugify = require("slugify");
 const mongoose = require("mongoose");
 const { getFullUrl } = require("../../utils/urlHelper");
@@ -32,13 +35,20 @@ exports.getCourseBySlug = async (req, res) => {
     const whoShouldEnroll = await CourseWhoShouldEnroll.find({ course_id: course._id }).sort({ order_index: 1 });
     const learningPoints = await CourseLearningPoint.find({ course_id: course._id }).sort({ order_index: 1 });
     const curriculum = await CourseCurriculum.find({ course_id: course._id }).sort({ order_index: 1 });
+    const courseIncludes = await CourseInclude.find({ course_id: course._id }).sort({ order_index: 1 });
     const reviews = await CourseReview.find({ course_id: course._id }).sort({ createdAt: -1 });
+
+    // Fetch Enquiry counts
+    const enquiryCount = await Enquiry.countDocuments({ course: course.title });
+    const registrationCount = await Registration.countDocuments({ courseId: course._id });
 
     const courseObj = course.toObject();
     courseObj.whoShouldEnroll = whoShouldEnroll;
     courseObj.learningPoints = learningPoints;
     courseObj.curriculum = curriculum;
+    courseObj.courseIncludes = courseIncludes;
     courseObj.reviews = reviews;
+    courseObj.enquiryCount = (enquiryCount || 0) + (registrationCount || 0);
 
     // Convert decimals/numbers
     courseObj.price = Number(courseObj.price);
@@ -70,7 +80,7 @@ exports.createCourse = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    const { whoShouldEnroll, learningPoints, curriculum, skills, ...courseData } =
+    const { whoShouldEnroll, learningPoints, curriculum, courseIncludes, skills, ...courseData } =
       req.body;
       
     if (skills) {
@@ -144,6 +154,13 @@ exports.createCourse = async (req, res) => {
       }
     }
 
+    if (courseIncludes) {
+      const parsed = safeParse(courseIncludes);
+      if (parsed.length > 0) {
+        await CourseInclude.insertMany(parsed.map(item => ({ ...item, course_id: courseId })), { session });
+      }
+    }
+
     await session.commitTransaction();
     session.endSession();
 
@@ -184,6 +201,7 @@ exports.deleteCourse = async (req, res) => {
     await CourseWhoShouldEnroll.deleteMany({ course_id: id }, { session });
     await CourseLearningPoint.deleteMany({ course_id: id }, { session });
     await CourseCurriculum.deleteMany({ course_id: id }, { session });
+    await CourseInclude.deleteMany({ course_id: id }, { session });
     await CourseReview.deleteMany({ course_id: id }, { session });
 
     await session.commitTransaction();
@@ -221,7 +239,7 @@ exports.updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { whoShouldEnroll, learningPoints, curriculum, skills, ...courseData } =
+    const { whoShouldEnroll, learningPoints, curriculum, courseIncludes, skills, ...courseData } =
       req.body;
 
     if (typeof skills !== "undefined") {
@@ -292,6 +310,9 @@ exports.updateCourse = async (req, res) => {
     const parsedCurriculum =
       typeof curriculum !== "undefined" ? safeParse(curriculum) : null;
 
+    const parsedCourseIncludes =
+      typeof courseIncludes !== "undefined" ? safeParse(courseIncludes) : null;
+
     if (parsedWhoShouldEnroll !== null) {
       await CourseWhoShouldEnroll.deleteMany({ course_id: id }, { session });
       if (parsedWhoShouldEnroll.length > 0) {
@@ -310,6 +331,13 @@ exports.updateCourse = async (req, res) => {
       await CourseCurriculum.deleteMany({ course_id: id }, { session });
       if (parsedCurriculum.length > 0) {
         await CourseCurriculum.insertMany(parsedCurriculum.map(item => ({ ...item, course_id: id })), { session });
+      }
+    }
+
+    if (parsedCourseIncludes !== null) {
+      await CourseInclude.deleteMany({ course_id: id }, { session });
+      if (parsedCourseIncludes.length > 0) {
+        await CourseInclude.insertMany(parsedCourseIncludes.map(item => ({ ...item, course_id: id })), { session });
       }
     }
 

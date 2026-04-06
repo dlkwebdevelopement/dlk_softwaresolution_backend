@@ -1382,6 +1382,8 @@ exports.createLiveClass = async (req, res) => {
       });
     }
 
+    const image = req.file ? req.file.path.replace(/\\/g, "/") : "";
+
     const liveClass = await LiveClass.create({
       courseId,
       title,
@@ -1390,6 +1392,7 @@ exports.createLiveClass = async (req, res) => {
       startTime,
       endTime,
       isActive,
+      image,
     });
 
     return res.status(201).json(liveClass);
@@ -1446,9 +1449,12 @@ exports.updateLiveClass = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const updated = await LiveClass.findByIdAndUpdate(id, {
-      ...req.body,
-    }, { returnDocument: 'after' });
+    const updateData = { ...req.body };
+    if (req.file) {
+      updateData.image = req.file.path.replace(/\\/g, "/");
+    }
+
+    const updated = await LiveClass.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 
     if (!updated) {
       return res.status(404).json({ message: "Live class not found" });
