@@ -48,11 +48,18 @@ exports.getCourseBySlug = async (req, res) => {
     courseObj.curriculum = curriculum;
     courseObj.courseIncludes = courseIncludes;
     courseObj.reviews = reviews;
+    courseObj.total_ratings = reviews.length; // Ensure this matches current reviews count
     courseObj.enquiryCount = (enquiryCount || 0) + (registrationCount || 0);
 
     // Convert decimals/numbers
     courseObj.price = Number(courseObj.price);
     courseObj.original_price = Number(courseObj.original_price);
+    
+    // If rating is 0, recalculate from current reviews for accuracy
+    if (!courseObj.rating || courseObj.rating === 0) {
+      const sum = reviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+      courseObj.rating = reviews.length > 0 ? (sum / reviews.length).toFixed(1) : 0;
+    }
     courseObj.rating = Number(courseObj.rating);
 
     // ✅ Add URLs
@@ -439,6 +446,57 @@ exports.getCoursesByCategory = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch courses",
+    });
+  }
+};
+
+// post course review
+exports.postCourseReview = async (req, res) => {
+  try {
+    const { course_id, student_name, rating, review } = req.body;
+
+    if (!course_id || !student_name || !rating || !review) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // Create the review
+    const newReview = await CourseReview.create({
+      course_id,
+      student_name,
+      rating: Number(rating),
+      review,
+    });
+
+    // Recalculate Course Stats
+    const allReviews = await CourseReview.find({ course_id });
+    const totalRatings = allReviews.length > 0 ? allReviews.length : 0;
+    
+    let averageRating = 0;
+    if (totalRatings > 0) {
+      const sum = allReviews.reduce((acc, r) => acc + (Number(r.rating) || 0), 0);
+      averageRating = (sum / totalRatings).toFixed(1);
+    }
+
+    // Use findOneAndUpdate for better consistency with string-based _id
+    await Course.findOneAndUpdate({ _id: course_id }, {
+      rating: Number(averageRating),
+      total_ratings: totalRatings,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Review submitted successfully!",
+      data: newReview,
+    });
+  } catch (error) {
+    console.error("Post Course Review Detailed Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to submit review",
+      error: error.message, // Return error message during debugging
     });
   }
 };

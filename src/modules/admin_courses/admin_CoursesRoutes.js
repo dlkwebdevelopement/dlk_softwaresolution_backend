@@ -8,6 +8,7 @@ const {
   getCourseBySlug,
   getAllCourses,
   getCoursesByCategory,
+  postCourseReview,
 } = require("./admin_CoursesController");
 
 // CREATE COURSE
@@ -42,6 +43,9 @@ router.get("/course", getAllCourses);
 
 //get courses with category id
 router.get("/course/category/:categoryId", getCoursesByCategory);
+
+// post course review
+router.post("/course/review", postCourseReview);
 
 
 module.exports = router;
