@@ -221,8 +221,8 @@ router.post("/gallery-events", upload.fields([
   { name: "galleryImages", maxCount: 20 },
 ]), createGalleryEvent);
 router.get("/gallery-events", getAllGalleryEvents);
-router.delete("/gallery-event/:id", deleteGalleryEvent);
-router.put("/gallery-event/:id", upload.fields([
+router.delete("/gallery-events/:id", deleteGalleryEvent);
+router.put("/gallery-events/:id", upload.fields([
   { name: "mainImage", maxCount: 1 },
   { name: "galleryImages", maxCount: 10 },
 ]), updateGalleryEvent);
@@ -247,10 +247,20 @@ router.post("/office-gallery-events", upload.fields([
   { name: "galleryImages", maxCount: 20 },
 ]), createOfficeGalleryEvent);
 router.get("/office-gallery-events", getAllOfficeGalleryEvents);
-router.delete("/office-gallery-event/:id", deleteOfficeGalleryEvent);
-router.put("/office-gallery-event/:id", upload.fields([
+router.delete("/office-gallery-events/:id", deleteOfficeGalleryEvent);
+router.put("/office-gallery-events/:id", upload.fields([
   { name: "mainImage", maxCount: 1 },
   { name: "galleryImages", maxCount: 10 },
 ]), updateOfficeGalleryEvent);
+
+// 🔍 Catch-all for /admin to debug 404s
+router.use((req, res) => {
+  console.log(`❌ [404 NOT FOUND] No admin route found for: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    success: false,
+    message: `Admin route not found: ${req.method} ${req.originalUrl}`,
+    hint: "Check if you are using singular vs plural (e.g., gallery-event vs gallery-events)"
+  });
+});
 
 module.exports = router;

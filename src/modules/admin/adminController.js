@@ -122,27 +122,6 @@ exports.getGallery = async (req, res) => {
 };
 
 /* =========================
-   UPDATE GALLERY ALBUM
-========================= */
-exports.updateGallery = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { albumName } = req.body;
-
-    const existing = await Gallery.findById(id);
-    if (!existing) return res.status(404).json({ message: "Album not found" });
-
-    if (albumName) existing.albumName = albumName;
-
-    await existing.save();
-    res.status(200).json({ message: "Album updated successfully", data: existing });
-  } catch (err) {
-    console.error("UPDATE GALLERY ERROR:", err);
-    res.status(500).json({ message: err.message });
-  }
-};
-
-/* =========================
    ADD IMAGES TO GALLERY
 ========================= */
 exports.addGalleryImages = async (req, res) => {
@@ -236,9 +215,25 @@ exports.updateGalleryAlbum = async (req, res) => {
     const album = await Gallery.findById(id);
     if (!album) return res.status(404).json({ message: "Album not found" });
 
+    // Handle Directory Rename if album name changed
+    if (albumName && albumName !== album.albumName) {
+      const oldDir = path.join(process.cwd(), "uploads", album.albumName);
+      const newDir = path.join(process.cwd(), "uploads", albumName);
+      
+      if (fs.existsSync(oldDir)) {
+        fs.renameSync(oldDir, newDir);
+      }
+      
+      // Update internal image references in the array
+      album.images = album.images.map(img => 
+        img.replace(`uploads/${album.albumName}/`, `uploads/${albumName}/`)
+      );
+      album.albumName = albumName;
+    }
+
     let thumbnail = album.thumbnail;
     if (req.file) {
-      // Delete old thumbnail
+      // Delete old thumbnail if it exists
       if (album.thumbnail) {
         const oldPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
@@ -246,12 +241,10 @@ exports.updateGalleryAlbum = async (req, res) => {
       thumbnail = getFullUrl(`uploads/${req.file.filename}`);
     }
 
-    const updatedAlbum = await Gallery.findByIdAndUpdate(id, {
-      albumName: albumName || album.albumName,
-      thumbnail
-    }, { new: true });
+    album.thumbnail = thumbnail;
+    await album.save();
 
-    res.status(200).json({ message: "Album updated successfully", data: updatedAlbum });
+    res.status(200).json({ message: "Album updated successfully", data: album });
   } catch (err) {
     console.error("UPDATE GALLERY ALBUM ERROR:", err);
     res.status(500).json({ message: err.message });
@@ -345,8 +338,12 @@ exports.getAllGalleryEvents = async (req, res) => {
 exports.deleteGalleryEvent = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`🗑️ ATTEMPTING DELETE Gallery Event: [ID: ${id}]`);
     const event = await GalleryEvent.findById(id);
-    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+    if (!event) {
+      console.log(`⚠️ Delete failed: Event not found for ID: ${id}`);
+      return res.status(404).json({ success: false, message: "Event not found" });
+    }
 
     // Physical deletion of main image
     if (event.mainImage) {
@@ -466,6 +463,22 @@ exports.updateOfficeGalleryAlbum = async (req, res) => {
     const album = await OfficeGallery.findById(id);
     if (!album) return res.status(404).json({ message: "Office Album not found" });
 
+    // Handle Directory Rename if album name changed
+    if (albumName && albumName !== album.albumName) {
+      const oldDir = path.join(process.cwd(), "uploads", `office_${album.albumName}`);
+      const newDir = path.join(process.cwd(), "uploads", `office_${albumName}`);
+      
+      if (fs.existsSync(oldDir)) {
+        fs.renameSync(oldDir, newDir);
+      }
+      
+      // Update internal image references in the array
+      album.images = album.images.map(img => 
+        img.replace(`uploads/office_${album.albumName}/`, `uploads/office_${albumName}/`)
+      );
+      album.albumName = albumName;
+    }
+
     let thumbnail = album.thumbnail;
     if (req.file) {
       if (album.thumbnail) {
@@ -475,12 +488,10 @@ exports.updateOfficeGalleryAlbum = async (req, res) => {
       thumbnail = getFullUrl(`uploads/${req.file.filename}`);
     }
 
-    const updatedAlbum = await OfficeGallery.findByIdAndUpdate(id, {
-      albumName: albumName || album.albumName,
-      thumbnail
-    }, { new: true });
+    album.thumbnail = thumbnail;
+    await album.save();
 
-    res.status(200).json({ message: "Office Album updated successfully", data: updatedAlbum });
+    res.status(200).json({ message: "Office Album updated successfully", data: album });
   } catch (err) {
     console.error("UPDATE OFFICE GALLERY ALBUM ERROR:", err);
     res.status(500).json({ message: err.message });
