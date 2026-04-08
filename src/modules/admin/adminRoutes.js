@@ -253,14 +253,5 @@ router.put("/office-gallery-events/:id", upload.fields([
   { name: "galleryImages", maxCount: 10 },
 ]), updateOfficeGalleryEvent);
 
-// 🔍 Catch-all for /admin to debug 404s
-router.use((req, res) => {
-  console.log(`❌ [404 NOT FOUND] No admin route found for: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({
-    success: false,
-    message: `Admin route not found: ${req.method} ${req.originalUrl}`,
-    hint: "Check if you are using singular vs plural (e.g., gallery-event vs gallery-events)"
-  });
-});
-
+// End of Admin Routes
 module.exports = router;
