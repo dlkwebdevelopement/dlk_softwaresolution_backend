@@ -40,6 +40,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ✅ Routes
+// ✅ Admin Module Routes (Banners, Enquiries, Categories, etc.)
 const adminRoutes = require("./src/modules/admin/adminRoutes");
 app.use("/admin", adminRoutes);
 
@@ -52,6 +53,15 @@ app.use("/admin", adminContact);
 // ✅ Default route
 app.get("/", (req, res) => {
   res.send("✅ DLK Admin API is running...");
+});
+
+// 🔍 Debug route to verify server update
+app.get("/debug-routes", (req, res) => {
+  res.json({
+    status: "online",
+    timestamp: new Date().toISOString(),
+    message: "If you see this, the server is running the LATEST code updates."
+  });
 });
 
 // ✅ Error handling middleware

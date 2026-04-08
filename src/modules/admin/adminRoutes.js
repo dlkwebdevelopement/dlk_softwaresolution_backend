@@ -13,6 +13,8 @@ const {
   updateBanner,
   getBanners,
   deleteBanner,
+  toggleBanner,
+  toggleBannerContent,
   uploadOffer,
   getOffers,
   updateOffer,
@@ -27,7 +29,6 @@ const {
   deleteQuestion,
   updateAnswer,
   deleteAnswer,
-
   createEnquiry,
   getCategoriesWithSubs,
   createRegistration,
@@ -86,10 +87,34 @@ const {
   postWorkshop,
   updateWorkshop,
   deleteWorkshop,
+  getOfficeGallery,
+  createOfficeGalleryAlbum,
+  updateOfficeGalleryAlbum,
+  deleteOfficeGalleryAlbum,
+  addOfficeGalleryImages,
+  deleteOfficeGalleryImage,
+  createOfficeGalleryEvent,
+  getAllOfficeGalleryEvents,
+  deleteOfficeGalleryEvent,
+  updateOfficeGalleryEvent,
 } = require("./adminController");
 
 // ✅ Admin Login
 router.post("/login", adminLogin);
+
+// 🔍 Diagnostic logging for all admin routes
+router.use((req, res, next) => {
+  console.log(`📡 ADMIN ROUTE HIT: [${req.method}] ${req.originalUrl}`);
+  next();
+});
+
+// ✅ Banner Routes
+router.post("/upload-banner", upload.single("photo"), uploadBanner);
+router.get("/banners", getBanners);
+router.put("/banner/:id", upload.single("photo"), updateBanner);
+router.delete("/banner/:id", deleteBanner);
+router.patch("/banner/:id/toggle", toggleBanner);
+router.patch("/banner-op/:id/toggle-visibility", toggleBannerContent);
 
 // ✅ Navbar (Category) Routes
 router.post("/category", upload.single("image"), createCategory);
@@ -105,11 +130,7 @@ router.patch("/enquiries/:id/read", markEnquiryRead);
 router.post("/enquiries/reply", replyToEnquiry);
 router.delete("/enquiries/:id", deleteEnquiry);
 
-// ✅ Banner Upload, Get, Update & Delete
-router.post("/upload-banner", upload.single("photo"), uploadBanner);
-router.get("/banners", getBanners);
-router.put("/banner/:id", upload.single("photo"), updateBanner);
-router.delete("/banner/:id", deleteBanner);
+
 
 // ✅ Offer Routes
 router.post("/offers", upload.single("photo"), uploadOffer);
@@ -131,47 +152,42 @@ router.delete("/faq/question/:id", deleteQuestion);
 router.put("/faq/answer/:id", updateAnswer);
 router.delete("/faq/answer/:id", deleteAnswer);
 
-
-// for registration
+// ✅ Registration
 router.post("/register", createRegistration);
 router.get("/register", getRegistrations);
 router.patch("/register/:id/read", markRegistrationRead);
 router.post("/register/reply", replyToRegistration);
 router.delete("/register/:id", deleteRegistration);
 
-//for upcoming live classes
+// ✅ Live Classes
 router.post("/liveclass", upload.single("image"), createLiveClass);
 router.get("/liveclass", getAllLiveClasses);
 router.get("/liveclass/:id", getLiveClassById);
 router.put("/liveclass/:id", upload.single("image"), updateLiveClass);
 router.delete("/liveclass/:id", deleteLiveClass);
 
-// ===============================
-// 📝 Blogs
-// ===============================
-
-// ✅ Blog Routes
+// ✅ Blogs
 router.post("/blogs", upload.single("image"), createBlog);
 router.get("/blogs", getAllBlogs);
 router.get("/blogs/:slug", getBlogBySlug);
 router.put("/blogs/:id", upload.single("image"), updateBlog);
 router.delete("/blogs/:id", deleteBlog);
 
-// ✅ Student Projects Routes
+// ✅ Student Projects
 router.post("/student-projects", upload.single("image"), createStudentProject);
 router.get("/student-projects", getAllStudentProjects);
 router.get("/student-projects/:slug", getStudentProjectBySlug);
 router.put("/student-projects/:id", upload.single("image"), updateStudentProject);
 router.delete("/student-projects/:id", deleteStudentProject);
 
-//testimonial
+// ✅ Testimonials
 router.get("/testimonial", getAllTestimonials);
 router.get("/testimonial/:id", getTestimonial);
 router.post("/testimonial", upload.single("image"), createTestimonial);
 router.put("/testimonial/:id", upload.single("image"), updateTestimonial);
 router.delete("/testimonial/:id", deleteTestimonial);
 
-// ✅ Gallery Routes
+// ✅ Gallery
 router.get("/gallery", getGallery);
 router.post("/gallery", upload.single("thumbnail"), createGalleryAlbum);
 router.put("/gallery/:id", upload.single("thumbnail"), updateGalleryAlbum);
@@ -179,19 +195,19 @@ router.delete("/gallery/:id", deleteGalleryAlbum);
 router.post("/gallery/:id/images", upload.array("images", 20), addGalleryImages);
 router.delete("/gallery/:id/image", deleteGalleryImage);
 
-// ✅ Video Routes
+// ✅ Videos
 router.get("/videos", getAllVideos);
 router.post("/videos", createVideo);
 router.put("/videos/:id", updateVideo);
 router.delete("/videos/:id", deleteVideo);
 
-// ✅ Skill Routes
+// ✅ Skills
 router.get("/skills", getAllSkills);
 router.post("/skills", upload.single("icon"), createSkill);
 router.put("/skills/:id", upload.single("icon"), updateSkill);
 router.delete("/skills/:id", deleteSkill);
 
-// ✅ Placement Routes
+// ✅ Placements
 router.get("/placements", getPlacements);
 router.post("/placements", upload.single("image"), uploadPlacement);
 router.put("/placements/reorder", reorderPlacements);
@@ -199,19 +215,42 @@ router.put("/placements/:id", upload.single("image"), updatePlacement);
 router.delete("/placements/:id", deletePlacement);
 router.patch("/placements/:id/toggle", togglePlacementActive);
 
-// ✅ Gallery Event Routes
+// ✅ Gallery Events
 router.post("/gallery-events", upload.fields([
-  { name: 'mainImage', maxCount: 1 },
-  { name: 'galleryImages', maxCount: 20 }
+  { name: "mainImage", maxCount: 1 },
+  { name: "galleryImages", maxCount: 20 },
 ]), createGalleryEvent);
 router.get("/gallery-events", getAllGalleryEvents);
 router.delete("/gallery-event/:id", deleteGalleryEvent);
-router.put("/gallery-event/:id", upload.fields([{ name: "mainImage", maxCount: 1 }, { name: "galleryImages", maxCount: 10 }]), updateGalleryEvent);
+router.put("/gallery-event/:id", upload.fields([
+  { name: "mainImage", maxCount: 1 },
+  { name: "galleryImages", maxCount: 10 },
+]), updateGalleryEvent);
 
 // ✅ Workshops
 router.get("/workshops", getAllWorkshops);
 router.post("/workshops", upload.single("image"), postWorkshop);
 router.put("/workshops/:id", upload.single("image"), updateWorkshop);
 router.delete("/workshops/:id", deleteWorkshop);
+
+// ✅ Office Gallery
+router.get("/office-gallery", getOfficeGallery);
+router.post("/office-gallery", upload.single("thumbnail"), createOfficeGalleryAlbum);
+router.put("/office-gallery/:id", upload.single("thumbnail"), updateOfficeGalleryAlbum);
+router.delete("/office-gallery/:id", deleteOfficeGalleryAlbum);
+router.post("/office-gallery/:id/images", upload.array("images", 20), addOfficeGalleryImages);
+router.delete("/office-gallery/:id/image", deleteOfficeGalleryImage);
+
+// ✅ Office Gallery Events
+router.post("/office-gallery-events", upload.fields([
+  { name: "mainImage", maxCount: 1 },
+  { name: "galleryImages", maxCount: 20 },
+]), createOfficeGalleryEvent);
+router.get("/office-gallery-events", getAllOfficeGalleryEvents);
+router.delete("/office-gallery-event/:id", deleteOfficeGalleryEvent);
+router.put("/office-gallery-event/:id", upload.fields([
+  { name: "mainImage", maxCount: 1 },
+  { name: "galleryImages", maxCount: 10 },
+]), updateOfficeGalleryEvent);
 
 module.exports = router;

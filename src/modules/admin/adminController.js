@@ -15,6 +15,8 @@ const StudentProject = require("../../models/admin_home/StudentProject");
 const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
 const GalleryEvent = require("../../models/admin_home/GalleryEvent");
+const OfficeGallery = require("../../models/admin_home/OfficeGallery");
+const OfficeGalleryEvent = require("../../models/admin_home/OfficeGalleryEvent");
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
@@ -230,7 +232,7 @@ exports.updateGalleryAlbum = async (req, res) => {
   try {
     const { id } = req.params;
     const { albumName } = req.body;
-    
+
     const album = await Gallery.findById(id);
     if (!album) return res.status(404).json({ message: "Album not found" });
 
@@ -372,7 +374,7 @@ exports.updateGalleryEvent = async (req, res) => {
   try {
     const { id } = req.params;
     const { categoryId, title, eventDate, eventTime } = req.body;
-    
+
     const event = await GalleryEvent.findById(id);
     if (!event) return res.status(404).json({ success: false, message: "Event not found" });
 
@@ -420,6 +422,277 @@ exports.updateGalleryEvent = async (req, res) => {
     res.status(200).json({ success: true, message: "Gallery event updated successfully", data: updatedEvent });
   } catch (err) {
     console.error("UPDATE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* =========================
+   OFFICE GALLERY ALBUMS (New Special Vertical)
+========================= */
+
+exports.getOfficeGallery = async (req, res) => {
+  try {
+    const data = await OfficeGallery.find();
+    res.status(200).json(data);
+  } catch (err) {
+    console.error("GET OFFICE GALLERY ALBUMS ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.createOfficeGalleryAlbum = async (req, res) => {
+  try {
+    const { albumName } = req.body;
+    if (!albumName) return res.status(400).json({ message: "Album name is required" });
+
+    let thumbnail = "";
+    if (req.file) {
+      thumbnail = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    const album = await OfficeGallery.create({ albumName, thumbnail });
+    res.status(201).json({ message: "Office Album created successfully", data: album });
+  } catch (err) {
+    console.error("CREATE OFFICE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updateOfficeGalleryAlbum = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { albumName } = req.body;
+
+    const album = await OfficeGallery.findById(id);
+    if (!album) return res.status(404).json({ message: "Office Album not found" });
+
+    let thumbnail = album.thumbnail;
+    if (req.file) {
+      if (album.thumbnail) {
+        const oldPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      thumbnail = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    const updatedAlbum = await OfficeGallery.findByIdAndUpdate(id, {
+      albumName: albumName || album.albumName,
+      thumbnail
+    }, { new: true });
+
+    res.status(200).json({ message: "Office Album updated successfully", data: updatedAlbum });
+  } catch (err) {
+    console.error("UPDATE OFFICE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteOfficeGalleryAlbum = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const album = await OfficeGallery.findById(id);
+    if (!album) return res.status(404).json({ message: "Office Album not found" });
+
+    if (album.thumbnail) {
+      const thumbPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
+      if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
+    }
+
+    const albumDir = path.join(process.cwd(), "uploads", `office_${album.albumName}`);
+    if (fs.existsSync(albumDir)) {
+      fs.rmSync(albumDir, { recursive: true, force: true });
+    }
+
+    await OfficeGallery.findByIdAndDelete(id);
+    res.status(200).json({ message: "Office Album deleted successfully" });
+  } catch (err) {
+    console.error("DELETE OFFICE GALLERY ALBUM ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.addOfficeGalleryImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await OfficeGallery.findById(id);
+    if (!existing) return res.status(404).json({ message: "Office Album not found" });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: "No images uploaded" });
+    }
+
+    const newImages = req.files.map(file => {
+      const filename = file.filename;
+      const albumDir = path.join("uploads", `office_${existing.albumName}`);
+      if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
+
+      const oldPath = file.path;
+      const newPath = path.join(albumDir, filename);
+      fs.renameSync(oldPath, newPath);
+
+      return getFullUrl(`uploads/office_${existing.albumName}/${filename}`);
+    });
+
+    existing.images.push(...newImages);
+    await existing.save();
+
+    res.status(200).json({ message: "Images added successfully to Office Album", data: existing });
+  } catch (err) {
+    console.error("ADD OFFICE GALLERY IMAGES ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteOfficeGalleryImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { imageUrl } = req.body;
+    if (!imageUrl) return res.status(400).json({ message: "Image URL is required" });
+
+    const existing = await OfficeGallery.findById(id);
+    if (!existing) return res.status(404).json({ message: "Office Album not found" });
+
+    existing.images = existing.images.filter(img => img !== imageUrl);
+
+    try {
+      const urlObj = new URL(imageUrl);
+      const relativePath = urlObj.pathname.startsWith('/') ? urlObj.pathname.slice(1) : urlObj.pathname;
+      const physicalPath = path.join(process.cwd(), relativePath);
+      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+    } catch (e) {
+      console.warn("Could not delete physical file:", e.message);
+    }
+
+    await existing.save();
+    res.status(200).json({ message: "Office image deleted successfully", data: existing });
+  } catch (err) {
+    console.error("DELETE OFFICE GALLERY IMAGE ERROR:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/* =========================
+   OFFICE GALLERY EVENTS
+========================= */
+
+exports.createOfficeGalleryEvent = async (req, res) => {
+  try {
+    const { categoryId, title, eventDate, eventTime } = req.body;
+    if (!categoryId || !title || !eventDate || !eventTime) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    let mainImage = "";
+    if (req.files && req.files.mainImage) {
+      mainImage = `uploads/${req.files.mainImage[0].filename}`;
+    }
+
+    let galleryImages = [];
+    if (req.files && req.files.galleryImages) {
+      galleryImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
+    }
+
+    const newEvent = await OfficeGalleryEvent.create({
+      categoryId,
+      title,
+      mainImage,
+      galleryImages,
+      eventDate,
+      eventTime,
+    });
+
+    res.status(201).json({ success: true, message: "Office Gallery event created successfully", data: newEvent });
+  } catch (err) {
+    console.error("CREATE OFFICE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAllOfficeGalleryEvents = async (req, res) => {
+  try {
+    const events = await OfficeGalleryEvent.find()
+      .populate("categoryId", "albumName")
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: events });
+  } catch (err) {
+    console.error("GET ALL OFFICE GALLERY EVENTS ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteOfficeGalleryEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const event = await OfficeGalleryEvent.findById(id);
+    if (!event) return res.status(404).json({ success: false, message: "Office Event not found" });
+
+    if (event.mainImage) {
+      const physicalPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
+      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+    }
+
+    if (event.galleryImages && event.galleryImages.length > 0) {
+      event.galleryImages.forEach(img => {
+        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
+        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+      });
+    }
+
+    await OfficeGalleryEvent.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "Office Gallery event deleted successfully" });
+  } catch (err) {
+    console.error("DELETE OFFICE GALLERY EVENT ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateOfficeGalleryEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { categoryId, title, eventDate, eventTime } = req.body;
+
+    const event = await OfficeGalleryEvent.findById(id);
+    if (!event) return res.status(404).json({ success: false, message: "Office Event not found" });
+
+    let mainImage = event.mainImage;
+    if (req.files && req.files.mainImage) {
+      if (event.mainImage) {
+        const oldPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
+        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      }
+      mainImage = `uploads/${req.files.mainImage[0].filename}`;
+    }
+
+    let galleryImages = [...event.galleryImages];
+
+    if (req.body.keepImages !== undefined) {
+      let keepImages = [];
+      try { keepImages = JSON.parse(req.body.keepImages); } catch (e) { keepImages = galleryImages; }
+      const removed = galleryImages.filter(img => !keepImages.includes(img));
+      removed.forEach(img => {
+        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
+        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
+      });
+      galleryImages = keepImages;
+    }
+
+    if (req.files && req.files.galleryImages) {
+      const newImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
+      galleryImages = [...galleryImages, ...newImages];
+    }
+
+    const updatedEvent = await OfficeGalleryEvent.findByIdAndUpdate(id, {
+      categoryId: categoryId || event.categoryId,
+      title: title || event.title,
+      eventDate: eventDate || event.eventDate,
+      eventTime: eventTime || event.eventTime,
+      mainImage,
+      galleryImages,
+    }, { new: true });
+
+    res.status(200).json({ success: true, message: "Office Gallery event updated successfully", data: updatedEvent });
+  } catch (err) {
+    console.error("UPDATE OFFICE GALLERY EVENT ERROR:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -776,6 +1049,9 @@ exports.updateBanner = async (req, res) => {
     existing.tagline = tagline ?? existing.tagline;
     existing.description = description ?? existing.description;
     existing.button = button ?? existing.button;
+    if (req.body.isContentActive !== undefined) {
+      existing.isContentActive = req.body.isContentActive === "true" || req.body.isContentActive === true;
+    }
     existing.photoUrl = photoUrl;
 
     await existing.save();
@@ -793,7 +1069,12 @@ exports.updateBanner = async (req, res) => {
 // ✅ Get all banners
 exports.getBanners = async (req, res) => {
   try {
-    const banners = await Banner.find();
+    const { admin } = req.query;
+    let query = {};
+    if (admin !== "true") {
+      query.isActive = true;
+    }
+    const banners = await Banner.find(query);
     res.status(200).json(banners || []);
   } catch (err) {
     console.error("Error fetching banners:", err);
@@ -1170,8 +1451,8 @@ exports.createRegistration = async (req, res) => {
     const userReply = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: isCurriculumRequest 
-        ? `Your Curriculum PDF - ${courseName}` 
+      subject: isCurriculumRequest
+        ? `Your Curriculum PDF - ${courseName}`
         : "Registration Successful - DLK Software Solutions",
       html: isCurriculumRequest
         ? `
@@ -1736,9 +2017,11 @@ exports.deleteBlog = async (req, res) => {
  */
 exports.createStudentProject = async (req, res) => {
   try {
+    console.log("=== Create Student Project Request ===");
     const { title, short_description, description } = req.body;
 
     if (!title || !short_description || !description || !req.file) {
+      console.log("❌ Create Failed: Missing required fields");
       return res.status(400).json({
         success: false,
         message: "All required fields including image must be provided",
@@ -1767,6 +2050,8 @@ exports.createStudentProject = async (req, res) => {
       description: cleanDescription,
       image: getFullUrl(`uploads/${req.file.filename}`),
     });
+
+    console.log("✅ Student Project Created:", project._id);
 
     return res.status(201).json({
       success: true,
@@ -1858,6 +2143,8 @@ exports.getStudentProjectBySlug = async (req, res) => {
  */
 exports.updateStudentProject = async (req, res) => {
   try {
+    console.log("=== Update Student Project Request ===");
+    console.log("ID:", req.params.id);
     const { id } = req.params;
     let updateData = { ...req.body };
 
@@ -1886,7 +2173,14 @@ exports.updateStudentProject = async (req, res) => {
       updateData.image = getFullUrl(`uploads/${req.file.filename}`);
       const oldProject = await StudentProject.findById(id);
       if (oldProject?.image) {
-        const oldImagePath = path.join(__dirname, "../../", oldProject.image);
+        // Correctly handle full URLs in image paths
+        let relativePath = oldProject.image;
+        if (oldProject.image.includes("/uploads/")) {
+          relativePath = "uploads/" + oldProject.image.split("/uploads/")[1];
+        }
+
+        const oldImagePath = path.join(__dirname, "../../", relativePath);
+        console.log("Deleting old project image:", oldImagePath);
         if (fs.existsSync(oldImagePath)) fs.unlinkSync(oldImagePath);
       }
     } else if (req.body.existingImage) {
@@ -1902,8 +2196,12 @@ exports.updateStudentProject = async (req, res) => {
 
     const updated = await StudentProject.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 
-    if (!updated)
+    if (!updated) {
+      console.log("❌ Update Failed: Project not found");
       return res.status(404).json({ success: false, message: "Student Project not found" });
+    }
+
+    console.log("✅ Student Project Updated:", updated._id);
 
     return res.status(200).json({
       success: true,
@@ -1925,15 +2223,33 @@ exports.updateStudentProject = async (req, res) => {
  */
 exports.deleteStudentProject = async (req, res) => {
   try {
+    console.log("=== Delete Student Project Request ===");
+    console.log("ID:", req.params.id);
     const { id } = req.params;
+
+    // Optional: delete image file before deleting record
+    const project = await StudentProject.findById(id);
+    if (project?.image) {
+      let relativePath = project.image;
+      if (project.image.includes("/uploads/")) {
+        relativePath = "uploads/" + project.image.split("/uploads/")[1];
+      }
+      const imagePath = path.join(__dirname, "../../", relativePath);
+      console.log("Deleting associated image file:", imagePath);
+      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+    }
+
     const deletedRows = await StudentProject.findByIdAndDelete(id);
 
     if (!deletedRows) {
+      console.log("❌ Delete Failed: Project not found");
       return res.status(404).json({
         success: false,
         message: "Student Project not found",
       });
     }
+
+    console.log("✅ Student Project Deleted");
 
     return res.status(200).json({
       success: true,
@@ -2405,7 +2721,7 @@ exports.reorderPlacements = async (req, res) => {
       return res.status(400).json({ message: "Orders array is required" });
     }
 
-    const updatePromises = orders.map(item => 
+    const updatePromises = orders.map(item =>
       Placement.findByIdAndUpdate(item.id, { displayOrder: item.displayOrder })
     );
 
@@ -2491,5 +2807,368 @@ exports.deleteWorkshop = async (req, res) => {
   } catch (err) {
     console.error("DELETE WORKSHOP ERROR:", err);
     res.status(500).json({ success: false, message: err.message });
+  }
+};
+// ✅ Upload banner
+exports.uploadBanner = async (req, res) => {
+  try {
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const { title, highlight, subtitle, tagline, description, button } = req.body;
+
+    if (!title || !highlight || !subtitle) {
+      return res.status(400).json({
+        message: "Title, highlight, and subtitle are required",
+      });
+    }
+
+    const banner = await Banner.create({
+      title,
+      highlight,
+      subtitle,
+      tagline: tagline || null,
+      description: description || null,
+      button: button || null,
+      photoUrl: getFullUrl(`uploads/${req.file.filename}`),
+      isActive: true,
+    });
+
+    res.status(201).json({ message: "Banner uploaded successfully", banner });
+  } catch (err) {
+    console.error("UPLOAD BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Update banner
+exports.updateBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, highlight, subtitle, tagline, description, button } = req.body;
+
+    const existing = await Banner.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    let photoUrl = existing.photoUrl;
+
+    if (req.file) {
+      const oldPath = path.join(
+        __dirname,
+        "../../../uploads",
+        path.basename(existing.photoUrl)
+      );
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      photoUrl = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    existing.title = title ?? existing.title;
+    existing.highlight = highlight ?? existing.highlight;
+    existing.subtitle = subtitle ?? existing.subtitle;
+    existing.tagline = tagline ?? existing.tagline;
+    existing.description = description ?? existing.description;
+    existing.button = button ?? existing.button;
+    existing.photoUrl = photoUrl;
+
+    await existing.save();
+
+    res.status(200).json({ message: "Banner updated successfully", banner: existing });
+  } catch (err) {
+    console.error("UPDATE BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Get all banners
+exports.getBanners = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
+    const filter = req.query.admin === "true" ? {} : { isActive: true };
+    const banners = await Banner.find(filter).sort({ createdAt: -1 });
+    res.status(200).json(banners || []);
+  } catch (err) {
+    console.error("Error fetching banners:", err);
+    res.status(500).json({ error: "Failed to fetch banners" });
+  }
+};
+
+// ✅ Delete banner
+exports.deleteBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const banner = await Banner.findById(id);
+    if (!banner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    const bannerPath = path.join(
+      __dirname,
+      "../../../uploads",
+      path.basename(banner.photoUrl)
+    );
+    if (fs.existsSync(bannerPath)) {
+      fs.unlinkSync(bannerPath);
+      console.log("🗑️ Deleted banner file:", bannerPath);
+    }
+
+    await Banner.findByIdAndDelete(id);
+    res.json({ message: "Banner deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting banner:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Toggle banner active/inactive
+exports.toggleBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const banner = await Banner.findOne({ _id: id });
+    if (!banner) {
+      console.error("❌ Banner toggle failed: Banner not found for id:", id);
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    banner.isActive = !banner.isActive;
+    await banner.save();
+
+    res.status(200).json({
+      message: `Banner ${banner.isActive ? "activated" : "deactivated"} successfully`,
+      banner,
+    });
+  } catch (err) {
+    console.error("TOGGLE BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Add/Update these functions in your adminController.js
+
+// ✅ Toggle banner content active/inactive
+exports.toggleBannerContent = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!id) {
+      console.warn(`⚠️ Banners-OP [${req.method}]: Attempted toggle without ID`);
+      return res.status(400).json({
+        success: false,
+        message: "Banner ID is required (must be in query params or body)"
+      });
+    }
+
+    const banner = await Banner.findOne({ _id: id });
+    if (!banner) {
+      console.error(`❌ Banners-OP [${req.method}]: Banner not found with ID:`, id);
+      return res.status(404).json({
+        success: false,
+        message: "Banner not found in database"
+      });
+    }
+
+    // Toggle the content active status
+    banner.isContentActive = !banner.isContentActive;
+    await banner.save();
+
+    console.log(`✅ Banners-OP [${req.method}]: Content ${banner.isContentActive ? "activated" : "deactivated"} for ID:`, id);
+
+    const bannerObj = banner.toObject();
+    bannerObj.id = bannerObj._id;
+    delete bannerObj._id;
+
+    res.status(200).json({
+      success: true,
+      message: `Banner content ${banner.isContentActive ? "activated" : "deactivated"} successfully`,
+      banner: bannerObj
+    });
+  } catch (err) {
+    console.error(`💥 Banners-OP [${req.method}] ERROR:`, err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
+// ✅ Toggle banner active/inactive
+exports.toggleBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const banner = await Banner.findOne({ _id: id });
+    if (!banner) {
+      return res.status(404).json({ success: false, message: "Banner not found" });
+    }
+
+    banner.isActive = !banner.isActive;
+    await banner.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Banner ${banner.isActive ? "activated" : "deactivated"} successfully`,
+      banner: {
+        id: banner._id,
+        ...banner.toObject()
+      }
+    });
+  } catch (err) {
+    console.error("TOGGLE BANNER ERROR:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+
+// ✅ Get all banners (with cache control)
+exports.getBanners = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.set("Pragma", "no-cache");
+    res.set("Expires", "0");
+
+    const filter = req.query.admin === "true" ? {} : { isActive: true };
+    const banners = await Banner.find(filter).sort({ createdAt: -1 });
+
+    // Transform _id to id for frontend consistency
+    const transformedBanners = banners.map(banner => ({
+      id: banner._id,
+      ...banner.toObject(),
+      _id: undefined
+    }));
+
+    res.status(200).json(transformedBanners || []);
+  } catch (err) {
+    console.error("Error fetching banners:", err);
+    res.status(500).json({ error: "Failed to fetch banners" });
+  }
+};
+
+// ✅ Upload banner
+exports.uploadBanner = async (req, res) => {
+  try {
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const { title, highlight, subtitle, tagline, description, button, isContentActive } = req.body;
+
+    if (!title || !highlight || !subtitle) {
+      return res.status(400).json({
+        message: "Title, highlight, and subtitle are required",
+      });
+    }
+
+    const banner = await Banner.create({
+      title,
+      highlight,
+      subtitle,
+      tagline: tagline || null,
+      description: description || null,
+      button: button || null,
+      photoUrl: getFullUrl(`uploads/${req.file.filename}`),
+      isActive: true,
+      isContentActive: isContentActive === 'true' || isContentActive === true,
+    });
+
+    res.status(201).json({
+      message: "Banner uploaded successfully",
+      banner: {
+        id: banner._id,
+        ...banner.toObject()
+      }
+    });
+  } catch (err) {
+    console.error("UPLOAD BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Update banner
+exports.updateBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, highlight, subtitle, tagline, description, button, isContentActive } = req.body;
+
+    const existing = await Banner.findById(id);
+    if (!existing) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    let photoUrl = existing.photoUrl;
+
+    if (req.file) {
+      const oldPath = path.join(
+        __dirname,
+        "../../../uploads",
+        path.basename(existing.photoUrl)
+      );
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+      photoUrl = getFullUrl(`uploads/${req.file.filename}`);
+    }
+
+    existing.title = title ?? existing.title;
+    existing.highlight = highlight ?? existing.highlight;
+    existing.subtitle = subtitle ?? existing.subtitle;
+    existing.tagline = tagline ?? existing.tagline;
+    existing.description = description ?? existing.description;
+    existing.button = button ?? existing.button;
+    existing.photoUrl = photoUrl;
+    if (isContentActive !== undefined) {
+      existing.isContentActive = isContentActive === 'true' || isContentActive === true;
+    }
+
+    await existing.save();
+
+    res.status(200).json({
+      message: "Banner updated successfully",
+      banner: {
+        id: existing._id,
+        ...existing.toObject()
+      }
+    });
+  } catch (err) {
+    console.error("UPDATE BANNER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ Delete banner
+exports.deleteBanner = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const banner = await Banner.findById(id);
+    if (!banner) {
+      return res.status(404).json({ message: "Banner not found" });
+    }
+
+    const bannerPath = path.join(
+      __dirname,
+      "../../../uploads",
+      path.basename(banner.photoUrl)
+    );
+    if (fs.existsSync(bannerPath)) {
+      fs.unlinkSync(bannerPath);
+      console.log("🗑️ Deleted banner file:", bannerPath);
+    }
+
+    await Banner.findByIdAndDelete(id);
+    res.json({ message: "Banner deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting banner:", err);
+    res.status(500).json({ error: err.message });
   }
 };

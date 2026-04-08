@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
-
 const { getFullUrl } = require("../../utils/urlHelper");
 
 const bannerSchema = new mongoose.Schema({
@@ -12,13 +11,15 @@ const bannerSchema = new mongoose.Schema({
   description: { type: String, trim: true },
   button: { type: String, trim: true },
   photoUrl: { type: String, required: true, trim: true, get: getFullUrl },
-}, { 
+  isActive: { type: Boolean, default: true },
+  isContentActive: { type: Boolean, default: true },
+}, {
   timestamps: true,
   toJSON: { virtuals: true, getters: true },
   toObject: { virtuals: true, getters: true }
 });
 
-bannerSchema.virtual("id").get(function() {
+bannerSchema.virtual("id").get(function () {
   return this._id;
 });
 
