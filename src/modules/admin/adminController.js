@@ -4,7 +4,7 @@ const CourseCategory = require("../../models/admin_courses/CourseCategory");
 const Course = require("../../models/admin_courses/Course");
 const Company = require("../../models/admin_home/Company");
 const Enquiry = require("../../models/admin_home/Enquiry");
-const { Question, Answer } = require("../../models/admin_home/Question");
+const { Question } = require("../../models/admin_home/Question");
 const Registration = require("../../models/admin_home/Registration");
 const LiveClass = require("../../models/admin_home/LiveClass");
 
@@ -1282,12 +1282,12 @@ exports.deleteCompany = async (req, res) => {
 // ✅ Add a new question
 exports.addQuestion = async (req, res) => {
   try {
-    const { question } = req.body;
-    if (!question) {
-      return res.status(400).json({ message: "Question is required" });
+    const { question, answer } = req.body;
+    if (!question || !answer) {
+      return res.status(400).json({ message: "Both question and answer are required" });
     }
 
-    const newQuestion = await Question.create({ question });
+    const newQuestion = await Question.create({ question, answer });
     res.status(201).json({
       message: "Question added successfully",
       question: newQuestion,
@@ -1298,36 +1298,10 @@ exports.addQuestion = async (req, res) => {
   }
 };
 
-// ✅ Add an answer for an existing question
-exports.addAnswer = async (req, res) => {
-  try {
-    const { answer, question_id } = req.body;
-    if (!answer || !question_id) {
-      return res
-        .status(400)
-        .json({ message: "Both answer and question_id are required" });
-    }
-
-    const question = await Question.findById(question_id);
-    if (!question) {
-      return res.status(404).json({ message: "Question not found" });
-    }
-
-    const newAnswer = await Answer.create({ answer, question_id });
-    res.status(201).json({
-      message: "Answer added successfully",
-      answer: newAnswer,
-    });
-  } catch (error) {
-    console.error("Error adding answer:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
-
-// ✅ Get all questions (with answers)
+// ✅ Get all questions
 exports.getAllQuestions = async (req, res) => {
   try {
-    const questions = await Question.find().populate("answers");
+    const questions = await Question.find();
     res.status(200).json(questions);
   } catch (error) {
     console.error("Error fetching questions:", error);
@@ -1339,13 +1313,30 @@ exports.getAllQuestions = async (req, res) => {
 exports.updateQuestion = async (req, res) => {
   try {
     const { id } = req.params;
-    const { question } = req.body;
+    const { question, answer } = req.body;
 
-    const updatedQuestion = await Question.findByIdAndUpdate(id, {
-      question,
-    }, { returnDocument: 'after' });
+    // Try finding by string ID first (for UUIDs), then by ObjectId if that fails
+    let updatedQuestion;
+    try {
+      updatedQuestion = await Question.findByIdAndUpdate(id, {
+        question,
+        answer,
+      }, { returnDocument: 'after' });
+    } catch (err) {
+      console.error("Update FAQ error (String ID failed):", err);
+      // If it failed because of ID format, it might be a legacy ObjectId
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        updatedQuestion = await Question.findByIdAndUpdate(new mongoose.Types.ObjectId(id), {
+          question,
+          answer,
+        }, { returnDocument: 'after' });
+      } else {
+        throw err;
+      }
+    }
 
     if (!updatedQuestion) {
+      console.warn(`FAQ update failed: Question with ID ${id} not found.`);
       return res.status(404).json({ message: "Question not found" });
     }
 
@@ -1363,9 +1354,20 @@ exports.updateQuestion = async (req, res) => {
 exports.deleteQuestion = async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Question.findByIdAndDelete(id);
 
-    if (!deleted) {
+    // Try finding by string ID first, then by ObjectId if that fails
+    let deletedQuestion;
+    try {
+      deletedQuestion = await Question.findByIdAndDelete(id);
+    } catch (err) {
+      if (mongoose.Types.ObjectId.isValid(id)) {
+        deletedQuestion = await Question.findByIdAndDelete(new mongoose.Types.ObjectId(id));
+      } else {
+        throw err;
+      }
+    }
+
+    if (!deletedQuestion) {
       return res.status(404).json({ message: "Question not found" });
     }
 
@@ -1376,46 +1378,10 @@ exports.deleteQuestion = async (req, res) => {
   }
 };
 
-// ✅ Update an answer
-exports.updateAnswer = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { answer } = req.body;
-
-    const updatedAnswer = await Answer.findByIdAndUpdate(id, {
-      answer,
-    }, { returnDocument: 'after' });
-
-    if (!updatedAnswer) {
-      return res.status(404).json({ message: "Answer not found" });
-    }
-
-    res.status(200).json({
-      message: "Answer updated successfully",
-      updatedAnswer,
-    });
-  } catch (error) {
-    console.error("Error updating answer:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
-
-// ✅ Delete an answer
-exports.deleteAnswer = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleted = await Answer.findByIdAndDelete(id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Answer not found" });
-    }
-
-    res.status(200).json({ message: "Answer deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting answer:", error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
-};
+// Deprecated: Redundant with new simplified FAQ model
+exports.addAnswer = async (req, res) => res.status(410).json({ message: "Deprecated: Add question with answer instead" });
+exports.updateAnswer = async (req, res) => res.status(410).json({ message: "Deprecated: Update question instead" });
+exports.deleteAnswer = async (req, res) => res.status(410).json({ message: "Deprecated: Delete question instead" });
 
 
 //registration
