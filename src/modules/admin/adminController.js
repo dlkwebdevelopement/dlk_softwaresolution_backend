@@ -292,8 +292,8 @@ exports.deleteGalleryImage = async (req, res) => {
 
 exports.createGalleryEvent = async (req, res) => {
   try {
-    const { categoryId, title, eventDate, eventTime } = req.body;
-    if (!categoryId || !title || !eventDate || !eventTime) {
+    const { categoryId, title, eventDate, eventTime, collegeName } = req.body;
+    if (!categoryId || !title || !eventDate) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
@@ -314,6 +314,7 @@ exports.createGalleryEvent = async (req, res) => {
       galleryImages,
       eventDate,
       eventTime,
+      collegeName,
     });
 
     res.status(201).json({ success: true, message: "Gallery event created successfully", data: newEvent });
@@ -370,7 +371,7 @@ exports.deleteGalleryEvent = async (req, res) => {
 exports.updateGalleryEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoryId, title, eventDate, eventTime } = req.body;
+    const { categoryId, title, eventDate, eventTime, collegeName } = req.body;
 
     const event = await GalleryEvent.findById(id);
     if (!event) return res.status(404).json({ success: false, message: "Event not found" });
@@ -411,7 +412,8 @@ exports.updateGalleryEvent = async (req, res) => {
       categoryId: categoryId || event.categoryId,
       title: title || event.title,
       eventDate: eventDate || event.eventDate,
-      eventTime: eventTime || event.eventTime,
+      eventTime: eventTime !== undefined ? eventTime : event.eventTime,
+      collegeName: collegeName !== undefined ? collegeName : event.collegeName,
       mainImage,
       galleryImages,
     }, { new: true });
@@ -589,8 +591,8 @@ exports.deleteOfficeGalleryImage = async (req, res) => {
 exports.createOfficeGalleryEvent = async (req, res) => {
   try {
     const { categoryId, title, eventDate, eventTime } = req.body;
-    if (!categoryId || !title || !eventDate || !eventTime) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!categoryId || !title || !eventDate) {
+      return res.status(400).json({ message: "Category, title and date are required" });
     }
 
     let mainImage = "";
@@ -696,7 +698,8 @@ exports.updateOfficeGalleryEvent = async (req, res) => {
       categoryId: categoryId || event.categoryId,
       title: title || event.title,
       eventDate: eventDate || event.eventDate,
-      eventTime: eventTime || event.eventTime,
+      eventTime: eventTime !== undefined ? eventTime : event.eventTime,
+
       mainImage,
       galleryImages,
     }, { new: true });

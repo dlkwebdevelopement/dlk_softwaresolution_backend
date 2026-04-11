@@ -9,7 +9,7 @@ const officeGalleryEventSchema = new mongoose.Schema({
   mainImage: { type: String, trim: true, get: getFullUrl },
   galleryImages: [{ type: String, trim: true, get: getFullUrl }],
   eventDate: { type: Date, required: true },
-  eventTime: { type: String, required: true, trim: true },
+  eventTime: { type: String, trim: true },
 }, { 
   timestamps: true,
   toJSON: { virtuals: true, getters: true },
