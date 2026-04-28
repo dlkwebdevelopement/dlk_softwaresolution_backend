@@ -14,8 +14,10 @@ const enquirySchema = new mongoose.Schema({
   },
   mobile: { type: String, required: true, trim: true },
   course: { type: String, required: true, trim: true, index: true },
-  location: { type: String, required: true, trim: true },
-  timeslot: { type: String, required: true, trim: true },
+  location: { type: String, trim: true },
+  timeslot: { type: String, trim: true },
+  message: { type: String, trim: true },
+  inquiryType: { type: String, trim: true },
   isRead: { type: Boolean, default: false },
   isReply: { type: Boolean, default: false },
 }, { 

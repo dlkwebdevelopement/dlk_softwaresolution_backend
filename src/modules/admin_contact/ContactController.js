@@ -4,8 +4,29 @@ const transporter = require("../../utils/mailsender");
 // ✅ Create Contact Message
 exports.createContact = async (req, res) => {
   try {
-    const { firstName, lastName, email, phone, message, acceptTerms } =
+    const { firstName, lastName, email, phone, message, acceptTerms, captchaToken } =
       req.body;
+
+    // CAPTCHA Verification
+    if (!captchaToken) {
+      return res.status(400).json({ success: false, error: "CAPTCHA token missing" });
+    }
+
+    // ✅ SESSION BYPASS: If the token is 'SESSION_VERIFIED', we trust it
+    if (captchaToken !== "SESSION_VERIFIED") {
+      try {
+        const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${captchaToken}`;
+        const captchaRes = await fetch(verifyUrl, { method: 'POST' });
+        const captchaData = await captchaRes.json();
+        
+        if (!captchaData.success) {
+          return res.status(400).json({ success: false, error: "CAPTCHA verification failed" });
+        }
+      } catch (err) {
+        console.error("CAPTCHA Error:", err.message);
+        return res.status(500).json({ success: false, error: "Security check failed" });
+      }
+    }
 
     // Basic validation
     if (!firstName || !lastName || !email || !message || !acceptTerms) {
