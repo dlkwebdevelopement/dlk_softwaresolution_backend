@@ -97,6 +97,10 @@ const {
   getAllOfficeGalleryEvents,
   deleteOfficeGalleryEvent,
   updateOfficeGalleryEvent,
+  generateBlogCode,
+  getBlogCodes,
+  deleteBlogCode,
+  createStudentBlog,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -172,6 +176,12 @@ router.get("/blogs", getAllBlogs);
 router.get("/blogs/:slug", getBlogBySlug);
 router.put("/blogs/:id", upload.single("image"), updateBlog);
 router.delete("/blogs/:id", deleteBlog);
+router.post("/blogs/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentBlog);
+
+// ✅ Blog Codes
+router.post("/blog-codes/generate", generateBlogCode);
+router.get("/blog-codes", getBlogCodes);
+router.delete("/blog-codes/:id", deleteBlogCode);
 
 // ✅ Student Projects
 router.post("/student-projects", upload.single("image"), createStudentProject);

@@ -11,6 +11,7 @@ const LiveClass = require("../../models/admin_home/LiveClass");
 const fs = require("fs");
 const path = require("path");
 const Blog = require("../../models/admin_home/Blog");
+const BlogCode = require("../../models/admin_home/BlogCode");
 const StudentProject = require("../../models/admin_home/StudentProject");
 const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
@@ -1800,7 +1801,9 @@ exports.createBlog = async (req, res) => {
       slug,
       short_description,
       description: cleanDescription,
-      image: getFullUrl(`uploads/${req.file.filename}`), // Always use the uploaded file
+      image: getFullUrl(`uploads/${req.file.filename}`),
+      authorType: "Admin",
+      isApproved: true,
     });
 
     return res.status(201).json({
@@ -1827,9 +1830,15 @@ exports.getAllBlogs = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const total = await Blog.countDocuments();
-    const results = await Blog.find()
-      .select("_id title slug short_description image createdAt views")
+    const filter = {};
+    if (req.query.approved === "true") {
+      // Show blogs that are explicitly approved OR legacy blogs that don't have the field yet
+      filter.isApproved = { $ne: false };
+    }
+
+    const total = await Blog.countDocuments(filter);
+    const results = await Blog.find(filter)
+      .select("_id title slug short_description image createdAt views authorType studentName studentProfilePic isApproved")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -1996,6 +2005,101 @@ exports.deleteBlog = async (req, res) => {
       success: false,
       message: "Internal server error",
     });
+  }
+};
+
+/**
+ * GENERATE Blog Code
+ */
+exports.generateBlogCode = async (req, res) => {
+  try {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const newCode = await BlogCode.create({ code });
+    res.status(201).json({ success: true, data: newCode });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET All Blog Codes
+ */
+exports.getBlogCodes = async (req, res) => {
+  try {
+    const codes = await BlogCode.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: codes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE Blog Code
+ */
+exports.deleteBlogCode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await BlogCode.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "Code deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * CREATE Student Blog
+ */
+exports.createStudentBlog = async (req, res) => {
+  try {
+    const { title, short_description, description, studentName, code, category } = req.body;
+    
+    if (!title || !short_description || !description || !studentName || !code || !req.files || !req.files.image || !req.files.studentProfilePic) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+
+    // Check code
+    const codeDoc = await BlogCode.findOne({ code, isUsed: false });
+    if (!codeDoc) {
+      return res.status(400).json({ success: false, message: "Invalid or already used code" });
+    }
+
+    // Check if code is expired (1 day = 24 hours)
+    const now = new Date();
+    const codeDate = new Date(codeDoc.createdAt);
+    const diffHours = (now - codeDate) / (1000 * 60 * 60);
+
+    if (diffHours > 24) {
+      return res.status(400).json({ success: false, message: "This code has expired (valid only for 24 hours)" });
+    }
+
+    // Generate slug
+    let slug = slugify(title, { lower: true, strict: true });
+    const existingSlug = await Blog.findOne({ slug });
+    if (existingSlug) {
+      slug = `${slug}-${Date.now()}`;
+    }
+
+    const blog = await Blog.create({
+      title,
+      slug,
+      short_description,
+      description,
+      image: getFullUrl(`uploads/${req.files.image[0].filename}`),
+      studentName,
+      studentProfilePic: getFullUrl(`uploads/${req.files.studentProfilePic[0].filename}`),
+      authorType: "Student",
+      category: category || "General",
+      isApproved: false,
+    });
+
+    // Mark code as used
+    codeDoc.isUsed = true;
+    await codeDoc.save();
+
+    res.status(201).json({ success: true, message: "Blog posted successfully as student", data: blog });
+  } catch (error) {
+    console.error("Create Student Blog Error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

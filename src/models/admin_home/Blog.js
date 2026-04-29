@@ -10,6 +10,12 @@ const blogSchema = new mongoose.Schema({
   short_description: { type: String, required: true, trim: true },
   description: { type: String, required: true, trim: true },
   image: { type: String, required: true, trim: true, get: getFullUrl },
+  authorType: { type: String, enum: ["Admin", "Student"], default: "Admin" },
+  studentName: { type: String, trim: true },
+  studentProfilePic: { type: String, trim: true },
+  category: { type: String, default: "General", trim: true },
+  isApproved: { type: Boolean, default: true },
+  time: { type: String, default: () => new Date().toLocaleTimeString() },
   views: { type: Number, default: 0 },
 }, { 
   timestamps: true,
