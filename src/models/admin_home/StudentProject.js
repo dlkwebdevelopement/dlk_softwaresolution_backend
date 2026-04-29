@@ -10,6 +10,10 @@ const studentProjectSchema = new mongoose.Schema({
   short_description: { type: String, required: true, trim: true },
   description: { type: String, required: true, trim: true },
   image: { type: String, required: true, trim: true, get: getFullUrl },
+  authorType: { type: String, enum: ["Admin", "Student"], default: "Admin" },
+  studentName: { type: String, trim: true },
+  studentProfilePic: { type: String, trim: true, get: getFullUrl },
+  isApproved: { type: Boolean, default: true },
   views: { type: Number, default: 0 },
 }, { 
   timestamps: true,

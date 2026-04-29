@@ -12,6 +12,7 @@ const fs = require("fs");
 const path = require("path");
 const Blog = require("../../models/admin_home/Blog");
 const BlogCode = require("../../models/admin_home/BlogCode");
+const ProjectCode = require("../../models/admin_home/ProjectCode");
 const StudentProject = require("../../models/admin_home/StudentProject");
 const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
@@ -2047,6 +2048,44 @@ exports.deleteBlogCode = async (req, res) => {
 };
 
 /**
+ * GENERATE Project Code
+ */
+exports.generateProjectCode = async (req, res) => {
+  try {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    const newCode = await ProjectCode.create({ code });
+    res.status(201).json({ success: true, data: newCode });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET All Project Codes
+ */
+exports.getProjectCodes = async (req, res) => {
+  try {
+    const codes = await ProjectCode.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: codes });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE Project Code
+ */
+exports.deleteProjectCode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await ProjectCode.findByIdAndDelete(id);
+    res.status(200).json({ success: true, message: "Code deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * CREATE Student Blog
  */
 exports.createStudentBlog = async (req, res) => {
@@ -2099,6 +2138,62 @@ exports.createStudentBlog = async (req, res) => {
     res.status(201).json({ success: true, message: "Blog posted successfully as student", data: blog });
   } catch (error) {
     console.error("Create Student Blog Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * CREATE Student Project (By Student with Code)
+ */
+exports.createStudentProjectForStudent = async (req, res) => {
+  try {
+    const { title, short_description, description, studentName, code } = req.body;
+
+    if (!title || !short_description || !description || !studentName || !code || !req.files || !req.files.image || !req.files.studentProfilePic) {
+      return res.status(400).json({ success: false, message: "All fields are required" });
+    }
+
+    // Check Project Code
+    const codeDoc = await ProjectCode.findOne({ code, isUsed: false });
+    if (!codeDoc) {
+      return res.status(400).json({ success: false, message: "Invalid or already used project code" });
+    }
+
+    // Check if code is expired (1 day = 24 hours)
+    const now = new Date();
+    const codeDate = new Date(codeDoc.createdAt);
+    const diffHours = (now - codeDate) / (1000 * 60 * 60);
+
+    if (diffHours > 24) {
+      return res.status(400).json({ success: false, message: "This code has expired (valid only for 24 hours)" });
+    }
+
+    // Generate slug
+    let slug = slugify(title, { lower: true, strict: true });
+    const existingSlug = await StudentProject.findOne({ slug });
+    if (existingSlug) {
+      slug = `${slug}-${Date.now()}`;
+    }
+
+    const project = await StudentProject.create({
+      title,
+      slug,
+      short_description,
+      description,
+      image: getFullUrl(`uploads/${req.files.image[0].filename}`),
+      studentName,
+      studentProfilePic: getFullUrl(`uploads/${req.files.studentProfilePic[0].filename}`),
+      authorType: "Student",
+      isApproved: false,
+    });
+
+    // Mark code as used
+    codeDoc.isUsed = true;
+    await codeDoc.save();
+
+    res.status(201).json({ success: true, message: "Project submitted successfully for review", data: project });
+  } catch (error) {
+    console.error("Create Student Project Error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -2173,9 +2268,17 @@ exports.getAllStudentProjects = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const total = await StudentProject.countDocuments();
-    const results = await StudentProject.find()
-      .select("_id title slug short_description image createdAt views")
+    // Filter by approval if query parameter is provided
+    const query = {};
+    if (req.query.approved === "true") {
+      query.isApproved = true;
+    } else if (req.query.approved === "false") {
+      query.isApproved = false;
+    }
+
+    const total = await StudentProject.countDocuments(query);
+    const results = await StudentProject.find(query)
+      .select("_id title slug short_description image createdAt views isApproved authorType studentName studentProfilePic")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);

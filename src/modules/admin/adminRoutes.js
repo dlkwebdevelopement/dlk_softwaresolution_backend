@@ -101,6 +101,10 @@ const {
   getBlogCodes,
   deleteBlogCode,
   createStudentBlog,
+  createStudentProjectForStudent,
+  generateProjectCode,
+  getProjectCodes,
+  deleteProjectCode,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -189,6 +193,12 @@ router.get("/student-projects", getAllStudentProjects);
 router.get("/student-projects/:slug", getStudentProjectBySlug);
 router.put("/student-projects/:id", upload.single("image"), updateStudentProject);
 router.delete("/student-projects/:id", deleteStudentProject);
+router.post("/student-projects/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentProjectForStudent);
+
+// ✅ Project Codes
+router.post("/project-codes/generate", generateProjectCode);
+router.get("/project-codes", getProjectCodes);
+router.delete("/project-codes/:id", deleteProjectCode);
 
 // ✅ Testimonials
 router.get("/testimonial", getAllTestimonials);
