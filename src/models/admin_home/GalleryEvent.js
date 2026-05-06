@@ -7,7 +7,10 @@ const galleryEventSchema = new mongoose.Schema({
   categoryId: { type: String, ref: "Gallery", required: true, index: true },
   title: { type: String, required: true, trim: true },
   mainImage: { type: String, trim: true, get: getFullUrl },
-  galleryImages: [{ type: String, trim: true, get: getFullUrl }],
+  galleryImages: [{ 
+    url: { type: String, trim: true, get: getFullUrl },
+    highlights: [{ type: String, trim: true }]
+  }],
   eventDate: { type: Date, required: true },
   eventTime: { type: String, trim: true },
   collegeName: { type: String, trim: true },

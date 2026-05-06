@@ -11,7 +11,14 @@ const gallerySchema = new mongoose.Schema({
     trim: true,
   },
   thumbnail: { type: String, trim: true, get: getFullUrl },
-  images: [{ type: String, trim: true, get: getFullUrl }],
+  batches: [{
+    _id: { type: String, default: uuidv4 },
+    batchName: { type: String, required: true, trim: true },
+    images: [{ 
+      url: { type: String, trim: true, get: getFullUrl },
+      highlights: [{ type: String, trim: true }]
+    }],
+  }],
 }, { 
   timestamps: true,
   toJSON: { virtuals: true, getters: true },

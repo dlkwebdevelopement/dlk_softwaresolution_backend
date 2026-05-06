@@ -63,8 +63,12 @@ const {
   createGalleryAlbum,
   updateGalleryAlbum,
   deleteGalleryAlbum,
-  addGalleryImages,
-  deleteGalleryImage,
+  addGalleryBatch,
+  updateGalleryBatch,
+  deleteGalleryBatch,
+  addBatchImages,
+  deleteBatchImage,
+  updateBatchImageHighlights,
   createVideo,
   getAllVideos,
   updateVideo,
@@ -83,6 +87,7 @@ const {
   getAllGalleryEvents,
   deleteGalleryEvent,
   updateGalleryEvent,
+  updateGalleryEventImageHighlights,
   getAllWorkshops,
   postWorkshop,
   updateWorkshop,
@@ -105,6 +110,7 @@ const {
   generateProjectCode,
   getProjectCodes,
   deleteProjectCode,
+  updateImageHighlights,
 } = require("./adminController");
 
 // ✅ Admin Login
@@ -212,8 +218,16 @@ router.get("/gallery", getGallery);
 router.post("/gallery", upload.single("thumbnail"), createGalleryAlbum);
 router.put("/gallery/:id", upload.single("thumbnail"), updateGalleryAlbum);
 router.delete("/gallery/:id", deleteGalleryAlbum);
-router.post("/gallery/:id/images", upload.array("images", 20), addGalleryImages);
-router.delete("/gallery/:id/image", deleteGalleryImage);
+
+// Batches
+router.post("/gallery/:id/batches", addGalleryBatch);
+router.put("/gallery/:id/batches/:batchId", updateGalleryBatch);
+router.delete("/gallery/:id/batches/:batchId", deleteGalleryBatch);
+
+// Batch Images
+router.post("/gallery/:id/batches/:batchId/images", upload.array("images", 20), addBatchImages);
+router.delete("/gallery/:id/batches/:batchId/image", deleteBatchImage);
+router.patch("/gallery/:id/batches/:batchId/image/highlights", updateBatchImageHighlights);
 
 // ✅ Videos
 router.get("/videos", getAllVideos);
@@ -246,6 +260,7 @@ router.put("/gallery-events/:id", upload.fields([
   { name: "mainImage", maxCount: 1 },
   { name: "galleryImages", maxCount: 10 },
 ]), updateGalleryEvent);
+router.patch("/gallery-events/:id/image/highlights", updateGalleryEventImageHighlights);
 
 // ✅ Workshops
 router.get("/workshops", getAllWorkshops);

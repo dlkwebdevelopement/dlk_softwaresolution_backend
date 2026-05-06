@@ -115,50 +115,127 @@ exports.getCategories = async (req, res) => {
 ========================= */
 exports.getGallery = async (req, res) => {
   try {
-    const data = await Gallery.find();
-    res.status(200).json(data);
+    const data = await Gallery.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data });
   } catch (err) {
     console.error("GET GALLERY ALBUMS ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 /* =========================
    ADD IMAGES TO GALLERY
 ========================= */
-exports.addGalleryImages = async (req, res) => {
+/* =========================
+   BATCH MANAGEMENT
+========================= */
+exports.addGalleryBatch = async (req, res) => {
   try {
     const { id } = req.params;
-    const existing = await Gallery.findById(id);
-    if (!existing) return res.status(404).json({ message: "Album not found" });
+    const { batchName } = req.body;
+    if (!batchName) return res.status(400).json({ success: false, message: "Batch name is required" });
 
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: "No images uploaded" });
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    album.batches.push({ batchName, images: [] });
+    await album.save();
+
+    res.status(201).json({ success: true, message: "Batch added successfully", data: album });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateGalleryBatch = async (req, res) => {
+  try {
+    const { id, batchId } = req.params;
+    const { batchName } = req.body;
+
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    const batch = album.batches.id(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    batch.batchName = batchName;
+    await album.save();
+
+    res.status(200).json({ success: true, message: "Batch updated successfully", data: album });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteGalleryBatch = async (req, res) => {
+  try {
+    const { id, batchId } = req.params;
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    const batch = album.batches.id(batchId);
+    if (batch) {
+      // Optional: Delete physical files associated with this batch
+      // For now we just remove from DB
+      album.batches.pull({ _id: batchId });
+      await album.save();
     }
 
-    // Move files to album-specific folder if needed, but for now we use the unique suffix from multer
-    // The user requested uploads/<albumName>/filename structure.
-    // We can rename/move them now.
+    res.status(200).json({ success: true, message: "Batch deleted successfully", data: album });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
-    const newImages = req.files.map(file => {
+/* =========================
+   ADD IMAGES TO BATCH
+========================= */
+exports.addBatchImages = async (req, res) => {
+  try {
+    const { id, batchId } = req.params;
+    const { highlights: highlightsRaw } = req.body;
+    let highlightsArray = [];
+    
+    if (highlightsRaw) {
+      try {
+        highlightsArray = JSON.parse(highlightsRaw);
+      } catch (e) {
+        highlightsArray = [];
+      }
+    }
+
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    const batch = album.batches.id(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No images uploaded" });
+    }
+
+    const newImages = req.files.map((file, index) => {
       const filename = file.filename;
-      const albumDir = path.join("uploads", existing.albumName);
+      const albumDir = path.join("uploads", album.albumName);
       if (!fs.existsSync(albumDir)) fs.mkdirSync(albumDir, { recursive: true });
 
       const oldPath = file.path;
       const newPath = path.join(albumDir, filename);
       fs.renameSync(oldPath, newPath);
 
-      return getFullUrl(`uploads/${existing.albumName}/${filename}`);
+      return { 
+        url: getFullUrl(`uploads/${album.albumName}/${filename}`), 
+        highlights: highlightsArray[index] || [] 
+      };
     });
 
-    existing.images.push(...newImages);
-    await existing.save();
+    batch.images.push(...newImages);
+    await album.save();
 
-    res.status(200).json({ message: "Images added successfully", data: existing });
+    res.status(200).json({ success: true, message: "Images added successfully", data: album });
   } catch (err) {
-    console.error("ADD GALLERY IMAGES ERROR:", err);
-    res.status(500).json({ message: err.message });
+    console.error("ADD BATCH IMAGES ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -167,19 +244,19 @@ exports.addGalleryImages = async (req, res) => {
 ========================= */
 exports.createGalleryAlbum = async (req, res) => {
   try {
-    const { albumName } = req.body;
-    if (!albumName) return res.status(400).json({ message: "Album name is required" });
+    const { albumName, batch } = req.body;
+    if (!albumName) return res.status(400).json({ success: false, message: "Album name is required" });
 
     let thumbnail = "";
     if (req.file) {
       thumbnail = getFullUrl(`uploads/${req.file.filename}`);
     }
 
-    const album = await Gallery.create({ albumName, thumbnail });
-    res.status(201).json({ message: "Album created successfully", data: album });
+    const album = await Gallery.create({ albumName, batch, thumbnail });
+    res.status(201).json({ success: true, message: "Album created successfully", data: album });
   } catch (err) {
     console.error("CREATE GALLERY ALBUM ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, message: "Internal server error: " + err.message });
   }
 };
 
@@ -212,10 +289,10 @@ exports.deleteGalleryAlbum = async (req, res) => {
 exports.updateGalleryAlbum = async (req, res) => {
   try {
     const { id } = req.params;
-    const { albumName } = req.body;
+    const { albumName, batch } = req.body;
 
     const album = await Gallery.findById(id);
-    if (!album) return res.status(404).json({ message: "Album not found" });
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
 
     // Handle Directory Rename if album name changed
     if (albumName && albumName !== album.albumName) {
@@ -223,13 +300,23 @@ exports.updateGalleryAlbum = async (req, res) => {
       const newDir = path.join(process.cwd(), "uploads", albumName);
       
       if (fs.existsSync(oldDir)) {
-        fs.renameSync(oldDir, newDir);
+        try {
+          fs.renameSync(oldDir, newDir);
+        } catch (renameErr) {
+          console.error("RENAME DIRECTORY ERROR:", renameErr);
+        }
       }
       
-      // Update internal image references in the array
-      album.images = album.images.map(img => 
-        img.replace(`uploads/${album.albumName}/`, `uploads/${albumName}/`)
-      );
+      // Update internal image references in-place across all batches
+      album.batches.forEach(batch => {
+        batch.images.forEach((img, idx) => {
+          if (typeof img === 'string') {
+            batch.images[idx] = img.replace(`uploads/${album.albumName}/`, `uploads/${albumName}/`);
+          } else if (img && img.url) {
+            img.url = img.url.replace(`uploads/${album.albumName}/`, `uploads/${albumName}/`);
+          }
+        });
+      });
       album.albumName = albumName;
     }
 
@@ -237,38 +324,52 @@ exports.updateGalleryAlbum = async (req, res) => {
     if (req.file) {
       // Delete old thumbnail if it exists
       if (album.thumbnail) {
-        const oldPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        try {
+          const oldPath = path.join(process.cwd(), "uploads", path.basename(album.thumbnail));
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        } catch (err) {
+          console.warn("OLD THUMBNAIL DELETE ERROR:", err);
+        }
       }
       thumbnail = getFullUrl(`uploads/${req.file.filename}`);
     }
 
     album.thumbnail = thumbnail;
+    if (batch !== undefined) album.batch = batch;
     await album.save();
 
-    res.status(200).json({ message: "Album updated successfully", data: album });
+    res.status(200).json({ success: true, message: "Album updated successfully", data: album });
   } catch (err) {
     console.error("UPDATE GALLERY ALBUM ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, message: "Internal server error: " + err.message });
   }
 };
 
 /* =========================
    DELETE GALLERY IMAGE
 ========================= */
-exports.deleteGalleryImage = async (req, res) => {
+/* =========================
+   DELETE BATCH IMAGE
+========================= */
+exports.deleteBatchImage = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, batchId } = req.params;
     if (!req.body || !req.body.imageUrl) {
-      return res.status(400).json({ message: "Image URL is required for deletion" });
+      return res.status(400).json({ success: false, message: "Image URL is required for deletion" });
     }
     const { imageUrl } = req.body;
 
-    const existing = await Gallery.findById(id);
-    if (!existing) return res.status(404).json({ message: "Album not found" });
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    const batch = album.batches.id(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
 
     // Remove from array
-    existing.images = existing.images.filter(img => img !== imageUrl);
+    batch.images = batch.images.filter(img => {
+      const currentUrl = typeof img === 'string' ? img : img.url;
+      return currentUrl === imageUrl;
+    });
 
     // Delete physical file
     try {
@@ -280,11 +381,49 @@ exports.deleteGalleryImage = async (req, res) => {
       console.warn("Could not delete physical file:", e.message);
     }
 
-    await existing.save();
-    res.status(200).json({ message: "Image deleted successfully", data: existing });
+    await album.save();
+    res.status(200).json({ success: true, message: "Image deleted successfully", data: album });
   } catch (err) {
-    console.error("DELETE GALLERY IMAGE ERROR:", err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/* =========================
+   UPDATE BATCH IMAGE HIGHLIGHTS
+========================= */
+exports.updateBatchImageHighlights = async (req, res) => {
+  try {
+    const { id, batchId } = req.params;
+    const { imageUrl, highlights } = req.body;
+
+    if (!imageUrl || !highlights) {
+      return res.status(400).json({ success: false, message: "Image URL and highlights are required" });
+    }
+
+    const album = await Gallery.findById(id);
+    if (!album) return res.status(404).json({ success: false, message: "Album not found" });
+
+    const batch = album.batches.id(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    const image = batch.images.find(img => {
+      const currentUrl = typeof img === 'string' ? img : img.url;
+      return currentUrl === imageUrl;
+    });
+
+    if (image) {
+      const newHighlights = Array.isArray(highlights) ? highlights : JSON.parse(highlights);
+      if (typeof image === 'string') {
+        // Can't add highlights to a string, but migration should have fixed this
+      } else {
+        image.highlights = newHighlights;
+      }
+    }
+
+    await album.save();
+    res.status(200).json({ success: true, message: "Highlights updated", data: album });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -294,9 +433,18 @@ exports.deleteGalleryImage = async (req, res) => {
 
 exports.createGalleryEvent = async (req, res) => {
   try {
-    const { categoryId, title, eventDate, eventTime, collegeName } = req.body;
+    const { categoryId, title, eventDate, eventTime, collegeName, highlights: highlightsRaw } = req.body;
     if (!categoryId || !title || !eventDate) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    let highlightsArray = [];
+    if (highlightsRaw) {
+      try {
+        highlightsArray = JSON.parse(highlightsRaw);
+      } catch (e) {
+        highlightsArray = [];
+      }
     }
 
     let mainImage = "";
@@ -306,7 +454,10 @@ exports.createGalleryEvent = async (req, res) => {
 
     let galleryImages = [];
     if (req.files && req.files.galleryImages) {
-      galleryImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
+      galleryImages = req.files.galleryImages.map((file, idx) => ({
+        url: `uploads/${file.filename}`,
+        highlights: highlightsArray[idx] || []
+      }));
     }
 
     const newEvent = await GalleryEvent.create({
@@ -370,10 +521,60 @@ exports.deleteGalleryEvent = async (req, res) => {
   }
 };
 
+/* =========================
+   UPDATE GALLERY EVENT IMAGE HIGHLIGHTS
+========================= */
+exports.updateGalleryEventImageHighlights = async (req, res) => {
+  try {
+    const { id } = req.params; // Event ID
+    const { imageUrl, highlights } = req.body;
+
+    if (!imageUrl || !highlights) {
+      return res.status(400).json({ success: false, message: "Image URL and highlights are required" });
+    }
+
+    const event = await GalleryEvent.findById(id);
+    if (!event) return res.status(404).json({ success: false, message: "Event not found" });
+
+    const imageIndex = event.galleryImages.findIndex(img => {
+      const currentUrl = typeof img === 'string' ? img : img.url;
+      return currentUrl === imageUrl;
+    });
+
+    if (imageIndex === -1) return res.status(404).json({ success: false, message: "Image not found in event" });
+
+    const newHighlights = Array.isArray(highlights) ? highlights : JSON.parse(highlights);
+
+    if (typeof event.galleryImages[imageIndex] === 'string') {
+      event.galleryImages[imageIndex] = {
+        url: event.galleryImages[imageIndex],
+        highlights: newHighlights
+      };
+    } else {
+      event.galleryImages[imageIndex].highlights = newHighlights;
+    }
+    
+    await event.save();
+    res.status(200).json({ success: true, message: "Highlights updated successfully", data: event });
+  } catch (err) {
+    console.error("UPDATE GALLERY EVENT IMAGE HIGHLIGHTS ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 exports.updateGalleryEvent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoryId, title, eventDate, eventTime, collegeName } = req.body;
+    const { categoryId, title, eventDate, eventTime, collegeName, keepImages, highlights: highlightsRaw } = req.body;
+
+    let highlightsArray = [];
+    if (highlightsRaw) {
+      try {
+        highlightsArray = JSON.parse(highlightsRaw);
+      } catch (e) {
+        highlightsArray = [];
+      }
+    }
 
     const event = await GalleryEvent.findById(id);
     if (!event) return res.status(404).json({ success: false, message: "Event not found" });
@@ -388,7 +589,33 @@ exports.updateGalleryEvent = async (req, res) => {
       mainImage = `uploads/${req.files.mainImage[0].filename}`;
     }
 
-    let galleryImages = [...event.galleryImages];
+    let galleryImages = [];
+    if (keepImages) {
+      const keep = JSON.parse(keepImages);
+      galleryImages = event.galleryImages.filter(img => {
+        const url = typeof img === 'string' ? img : img.url;
+        return keep.includes(url);
+      });
+    }
+
+    if (req.files && req.files.galleryImages) {
+      const newImages = req.files.galleryImages.map((file, idx) => ({
+        url: `uploads/${file.filename}`,
+        highlights: highlightsArray[idx] || []
+      }));
+      galleryImages = [...galleryImages, ...newImages];
+    }
+
+    event.categoryId = categoryId || event.categoryId;
+    event.title = title || event.title;
+    event.eventDate = eventDate || event.eventDate;
+    event.eventTime = eventTime || event.eventTime;
+    event.collegeName = collegeName || event.collegeName;
+    event.mainImage = mainImage;
+    event.galleryImages = galleryImages;
+
+    await event.save();
+    res.status(200).json({ success: true, message: "Gallery event updated successfully", data: event });
 
     // If keepImages is provided, compute what was removed and delete those files
     if (req.body.keepImages !== undefined) {
