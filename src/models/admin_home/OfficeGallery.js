@@ -1,17 +1,38 @@
 const mongoose = require("mongoose");
 const { v4: uuidv4 } = require("uuid");
+const { getFullUrl } = require("../../utils/urlHelper");
+
+const imageSchema = new mongoose.Schema(
+  {
+    _id: { type: String, default: uuidv4 },
+    url: { type: String, trim: true, get: getFullUrl },
+    highlights: [{ type: String, trim: true }],
+  },
+  { _id: false, id: false }
+);
+imageSchema.add({ _id: { type: String, default: uuidv4 } });
+
+const categorySchema = new mongoose.Schema(
+  {
+    _id: { type: String, default: uuidv4 },
+    categoryName: { type: String, required: true, trim: true },
+    images: [imageSchema],
+  },
+  { _id: false }
+);
+categorySchema.add({ _id: { type: String, default: uuidv4 } });
 
 const officeGallerySchema = new mongoose.Schema(
   {
     _id: { type: String, default: uuidv4 },
-    albumName: { type: String, required: true },
-    thumbnail: { type: String },
-    images: [{ type: String }],
+    batchName: { type: String, required: true, trim: true },
+    date: { type: Date },
+    categories: [categorySchema],
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    toJSON: { virtuals: true, getters: true },
+    toObject: { virtuals: true, getters: true },
   }
 );
 

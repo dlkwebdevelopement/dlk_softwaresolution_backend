@@ -93,15 +93,15 @@ const {
   updateWorkshop,
   deleteWorkshop,
   getOfficeGallery,
-  createOfficeGalleryAlbum,
-  updateOfficeGalleryAlbum,
-  deleteOfficeGalleryAlbum,
-  addOfficeGalleryImages,
-  deleteOfficeGalleryImage,
-  createOfficeGalleryEvent,
-  getAllOfficeGalleryEvents,
-  deleteOfficeGalleryEvent,
-  updateOfficeGalleryEvent,
+  createOfficeGalleryBatch,
+  updateOfficeGalleryBatch,
+  deleteOfficeGalleryBatch,
+  addOfficeGalleryCategory,
+  updateOfficeGalleryCategory,
+  deleteOfficeGalleryCategory,
+  addOfficeCategoryImages,
+  deleteOfficeCategoryImage,
+  updateOfficeCategoryImageHighlights,
   generateBlogCode,
   getBlogCodes,
   deleteBlogCode,
@@ -268,25 +268,21 @@ router.post("/workshops", upload.single("image"), postWorkshop);
 router.put("/workshops/:id", upload.single("image"), updateWorkshop);
 router.delete("/workshops/:id", deleteWorkshop);
 
-// ✅ Office Gallery
+// ✅ Office Gallery — Batch
 router.get("/office-gallery", getOfficeGallery);
-router.post("/office-gallery", upload.single("thumbnail"), createOfficeGalleryAlbum);
-router.put("/office-gallery/:id", upload.single("thumbnail"), updateOfficeGalleryAlbum);
-router.delete("/office-gallery/:id", deleteOfficeGalleryAlbum);
-router.post("/office-gallery/:id/images", upload.array("images", 20), addOfficeGalleryImages);
-router.delete("/office-gallery/:id/image", deleteOfficeGalleryImage);
+router.post("/office-gallery", createOfficeGalleryBatch);
+router.put("/office-gallery/:batchId", updateOfficeGalleryBatch);
+router.delete("/office-gallery/:batchId", deleteOfficeGalleryBatch);
 
-// ✅ Office Gallery Events
-router.post("/office-gallery-events", upload.fields([
-  { name: "mainImage", maxCount: 1 },
-  { name: "galleryImages", maxCount: 20 },
-]), createOfficeGalleryEvent);
-router.get("/office-gallery-events", getAllOfficeGalleryEvents);
-router.delete("/office-gallery-events/:id", deleteOfficeGalleryEvent);
-router.put("/office-gallery-events/:id", upload.fields([
-  { name: "mainImage", maxCount: 1 },
-  { name: "galleryImages", maxCount: 10 },
-]), updateOfficeGalleryEvent);
+// ✅ Office Gallery — Categories
+router.post("/office-gallery/:batchId/categories", addOfficeGalleryCategory);
+router.put("/office-gallery/:batchId/categories/:catId", updateOfficeGalleryCategory);
+router.delete("/office-gallery/:batchId/categories/:catId", deleteOfficeGalleryCategory);
+
+// ✅ Office Gallery — Images
+router.post("/office-gallery/:batchId/categories/:catId/images", upload.array("images", 20), addOfficeCategoryImages);
+router.delete("/office-gallery/:batchId/categories/:catId/image", deleteOfficeCategoryImage);
+router.patch("/office-gallery/:batchId/categories/:catId/image/highlights", updateOfficeCategoryImageHighlights);
 
 // End of Admin Routes
 module.exports = router;

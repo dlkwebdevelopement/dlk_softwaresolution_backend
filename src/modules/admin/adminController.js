@@ -18,7 +18,7 @@ const Offer = require("../../models/admin_home/Offer");
 const Gallery = require("../../models/admin_home/Gallery");
 const GalleryEvent = require("../../models/admin_home/GalleryEvent");
 const OfficeGallery = require("../../models/admin_home/OfficeGallery");
-const OfficeGalleryEvent = require("../../models/admin_home/OfficeGalleryEvent");
+
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
 const Testimonial = require("../../models/admin_home/Testimonials");
@@ -616,38 +616,6 @@ exports.updateGalleryEvent = async (req, res) => {
 
     await event.save();
     res.status(200).json({ success: true, message: "Gallery event updated successfully", data: event });
-
-    // If keepImages is provided, compute what was removed and delete those files
-    if (req.body.keepImages !== undefined) {
-      let keepImages = [];
-      try { keepImages = JSON.parse(req.body.keepImages); } catch (e) { keepImages = galleryImages; }
-
-      // Physically delete removed images
-      const removed = galleryImages.filter(img => !keepImages.includes(img));
-      removed.forEach(img => {
-        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
-        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
-      });
-      galleryImages = keepImages;
-    }
-
-    // Append any newly uploaded images
-    if (req.files && req.files.galleryImages) {
-      const newImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
-      galleryImages = [...galleryImages, ...newImages];
-    }
-
-    const updatedEvent = await GalleryEvent.findByIdAndUpdate(id, {
-      categoryId: categoryId || event.categoryId,
-      title: title || event.title,
-      eventDate: eventDate || event.eventDate,
-      eventTime: eventTime !== undefined ? eventTime : event.eventTime,
-      collegeName: collegeName !== undefined ? collegeName : event.collegeName,
-      mainImage,
-      galleryImages,
-    }, { new: true });
-
-    res.status(200).json({ success: true, message: "Gallery event updated successfully", data: updatedEvent });
   } catch (err) {
     console.error("UPDATE GALLERY EVENT ERROR:", err);
     res.status(500).json({ success: false, message: err.message });
@@ -814,134 +782,8 @@ exports.deleteOfficeGalleryImage = async (req, res) => {
 };
 
 /* =========================
-   OFFICE GALLERY EVENTS
-========================= */
-
-exports.createOfficeGalleryEvent = async (req, res) => {
-  try {
-    const { categoryId, title, eventDate, eventTime } = req.body;
-    if (!categoryId || !title || !eventDate) {
-      return res.status(400).json({ message: "Category, title and date are required" });
-    }
-
-    let mainImage = "";
-    if (req.files && req.files.mainImage) {
-      mainImage = `uploads/${req.files.mainImage[0].filename}`;
-    }
-
-    let galleryImages = [];
-    if (req.files && req.files.galleryImages) {
-      galleryImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
-    }
-
-    const newEvent = await OfficeGalleryEvent.create({
-      categoryId,
-      title,
-      mainImage,
-      galleryImages,
-      eventDate,
-      eventTime,
-    });
-
-    res.status(201).json({ success: true, message: "Office Gallery event created successfully", data: newEvent });
-  } catch (err) {
-    console.error("CREATE OFFICE GALLERY EVENT ERROR:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.getAllOfficeGalleryEvents = async (req, res) => {
-  try {
-    const events = await OfficeGalleryEvent.find()
-      .populate("categoryId", "albumName")
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: events });
-  } catch (err) {
-    console.error("GET ALL OFFICE GALLERY EVENTS ERROR:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.deleteOfficeGalleryEvent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const event = await OfficeGalleryEvent.findById(id);
-    if (!event) return res.status(404).json({ success: false, message: "Office Event not found" });
-
-    if (event.mainImage) {
-      const physicalPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
-      if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
-    }
-
-    if (event.galleryImages && event.galleryImages.length > 0) {
-      event.galleryImages.forEach(img => {
-        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
-        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
-      });
-    }
-
-    await OfficeGalleryEvent.findByIdAndDelete(id);
-    res.status(200).json({ success: true, message: "Office Gallery event deleted successfully" });
-  } catch (err) {
-    console.error("DELETE OFFICE GALLERY EVENT ERROR:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-
-exports.updateOfficeGalleryEvent = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { categoryId, title, eventDate, eventTime } = req.body;
-
-    const event = await OfficeGalleryEvent.findById(id);
-    if (!event) return res.status(404).json({ success: false, message: "Office Event not found" });
-
-    let mainImage = event.mainImage;
-    if (req.files && req.files.mainImage) {
-      if (event.mainImage) {
-        const oldPath = path.join(process.cwd(), "uploads", path.basename(event.mainImage));
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      }
-      mainImage = `uploads/${req.files.mainImage[0].filename}`;
-    }
-
-    let galleryImages = [...event.galleryImages];
-
-    if (req.body.keepImages !== undefined) {
-      let keepImages = [];
-      try { keepImages = JSON.parse(req.body.keepImages); } catch (e) { keepImages = galleryImages; }
-      const removed = galleryImages.filter(img => !keepImages.includes(img));
-      removed.forEach(img => {
-        const physicalPath = path.join(process.cwd(), "uploads", path.basename(img));
-        if (fs.existsSync(physicalPath)) fs.unlinkSync(physicalPath);
-      });
-      galleryImages = keepImages;
-    }
-
-    if (req.files && req.files.galleryImages) {
-      const newImages = req.files.galleryImages.map(file => `uploads/${file.filename}`);
-      galleryImages = [...galleryImages, ...newImages];
-    }
-
-    const updatedEvent = await OfficeGalleryEvent.findByIdAndUpdate(id, {
-      categoryId: categoryId || event.categoryId,
-      title: title || event.title,
-      eventDate: eventDate || event.eventDate,
-      eventTime: eventTime !== undefined ? eventTime : event.eventTime,
-
-      mainImage,
-      galleryImages,
-    }, { new: true });
-
-    res.status(200).json({ success: true, message: "Office Gallery event updated successfully", data: updatedEvent });
-  } catch (err) {
-    console.error("UPDATE OFFICE GALLERY EVENT ERROR:", err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-};
-/* =========================
    UPDATE NAVBAR ITEM
- ========================= */
+========================= */
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -1124,29 +966,13 @@ exports.getEnquiries = async (req, res) => {
 // ✅ Create a new enquiry
 exports.createEnquiry = async (req, res) => {
   try {
-    const { name, email, mobile, course, location, timeslot, message, inquiryType, captchaToken } = req.body;
+    const { name, email, mobile, course, location, timeslot, message, inquiryType } = req.body;
 
     // Basic required fields
     if (!name || !email || !mobile || !course) {
       return res.status(400).json({ error: "Name, email, mobile and course are mandatory" });
     }
 
-    if (!captchaToken) {
-      return res.status(400).json({ error: "CAPTCHA verification is required" });
-    }
-
-    // ✅ SESSION BYPASS: If the token is 'SESSION_VERIFIED', we trust it
-    if (captchaToken !== "SESSION_VERIFIED") {
-      const secretKey = process.env.RECAPTCHA_SECRET_KEY || "6LeIxAcTAAAAAGG-vFI1TnRWxMZNFuojJ4WifJWe";
-      const verificationUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${captchaToken}`;
-
-      const response = await fetch(verificationUrl, { method: 'POST' });
-      const data = await response.json();
-
-      if (!data.success) {
-        return res.status(400).json({ error: "Failed CAPTCHA verification. Please try again." });
-      }
-    }
 
     // 1️⃣ Save to DB
     const newEnquiry = await Enquiry.create({
@@ -3596,5 +3422,223 @@ exports.deleteBanner = async (req, res) => {
   } catch (err) {
     console.error("Error deleting banner:", err);
     res.status(500).json({ error: err.message });
+  }
+};
+/* =============================================================
+   OFFICE GALLERY — Batch > Category > Images
+============================================================= */
+
+// ✅ Get all batches
+exports.getOfficeGallery = async (req, res) => {
+  try {
+    const batches = await OfficeGallery.find().sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: batches });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Create batch
+exports.createOfficeGalleryBatch = async (req, res) => {
+  try {
+    const { batchName, date } = req.body;
+    if (!batchName) return res.status(400).json({ success: false, message: "Batch name is required" });
+
+    const batch = new OfficeGallery({ batchName, date: date || new Date(), categories: [] });
+    await batch.save();
+
+    res.status(201).json({ success: true, message: "Batch created", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Update batch
+exports.updateOfficeGalleryBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { batchName, date } = req.body;
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    if (batchName) batch.batchName = batchName;
+    if (date) batch.date = date;
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Batch updated", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Delete batch
+exports.deleteOfficeGalleryBatch = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const batch = await OfficeGallery.findByIdAndDelete(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    res.status(200).json({ success: true, message: "Batch deleted" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Add category to batch
+exports.addOfficeGalleryCategory = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    const { categoryName } = req.body;
+    if (!categoryName) return res.status(400).json({ success: false, message: "Category name is required" });
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    batch.categories.push({ categoryName, images: [] });
+    await batch.save();
+
+    res.status(201).json({ success: true, message: "Category added", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Update category
+exports.updateOfficeGalleryCategory = async (req, res) => {
+  try {
+    const { batchId, catId } = req.params;
+    const { categoryName } = req.body;
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    const cat = batch.categories.id(catId);
+    if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
+
+    if (categoryName) cat.categoryName = categoryName;
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Category updated", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Delete category
+exports.deleteOfficeGalleryCategory = async (req, res) => {
+  try {
+    const { batchId, catId } = req.params;
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    batch.categories.pull({ _id: catId });
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Category deleted", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Upload images to category
+exports.addOfficeCategoryImages = async (req, res) => {
+  try {
+    const { batchId, catId } = req.params;
+    const { highlights: highlightsRaw } = req.body;
+
+    let highlightsArray = [];
+    if (highlightsRaw) {
+      try { highlightsArray = JSON.parse(highlightsRaw); } catch (e) { highlightsArray = []; }
+    }
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    const cat = batch.categories.id(catId);
+    if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No images uploaded" });
+    }
+
+    const dirName = `${batch.batchName.replace(/\s+/g, "_")}_${batch._id}`;
+    const uploadDir = path.join("uploads", "office_gallery", dirName);
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+    const newImages = req.files.map((file, index) => {
+      const oldPath = file.path;
+      const newPath = path.join(uploadDir, file.filename);
+      fs.renameSync(oldPath, newPath);
+
+      return {
+        url: getFullUrl(`uploads/office_gallery/${dirName}/${file.filename}`),
+        highlights: highlightsArray[index] || [],
+      };
+    });
+
+    cat.images.push(...newImages);
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Images uploaded", data: batch });
+  } catch (err) {
+    console.error("ADD OFFICE CATEGORY IMAGES ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Delete image from category
+exports.deleteOfficeCategoryImage = async (req, res) => {
+  try {
+    const { batchId, catId } = req.params;
+    const { imageUrl } = req.body;
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    const cat = batch.categories.id(catId);
+    if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
+
+    if (imageUrl) {
+      try {
+        const urlPath = new URL(imageUrl).pathname;
+        const relativePath = decodeURIComponent(urlPath.replace(/^\/+/, ""));
+        const filePathLocal = path.join(__dirname, "../../..", relativePath);
+        if (fs.existsSync(filePathLocal)) fs.unlinkSync(filePathLocal);
+      } catch (e) { /* ignore file delete errors */ }
+    }
+
+    cat.images = cat.images.filter(img => img.url !== imageUrl);
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Image deleted", data: batch });
+  } catch (err) {
+    console.error("DELETE OFFICE CATEGORY IMAGE ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ Update image highlights in category
+exports.updateOfficeCategoryImageHighlights = async (req, res) => {
+  try {
+    const { batchId, catId } = req.params;
+    const { imageUrl, highlights } = req.body;
+
+    const batch = await OfficeGallery.findById(batchId);
+    if (!batch) return res.status(404).json({ success: false, message: "Batch not found" });
+
+    const cat = batch.categories.id(catId);
+    if (!cat) return res.status(404).json({ success: false, message: "Category not found" });
+
+    const imgObj = cat.images.find(img => img.url === imageUrl);
+    if (!imgObj) return res.status(404).json({ success: false, message: "Image not found" });
+
+    imgObj.highlights = highlights || [];
+    await batch.save();
+
+    res.status(200).json({ success: true, message: "Highlights updated", data: batch });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
