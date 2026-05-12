@@ -181,30 +181,30 @@ router.put("/liveclass/:id", upload.single("image"), updateLiveClass);
 router.delete("/liveclass/:id", deleteLiveClass);
 
 // ✅ Blogs
-router.post("/blogs", upload.single("image"), createBlog);
-router.get("/blogs", getAllBlogs);
-router.get("/blogs/:slug", getBlogBySlug);
-router.put("/blogs/:id", upload.single("image"), updateBlog);
-router.delete("/blogs/:id", deleteBlog);
-router.post("/blogs/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentBlog);
+// router.post("/blogs", upload.single("image"), createBlog);
+// router.get("/blogs", getAllBlogs);
+// router.get("/blogs/:slug", getBlogBySlug);
+// router.put("/blogs/:id", upload.single("image"), updateBlog);
+// router.delete("/blogs/:id", deleteBlog);
+// router.post("/blogs/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentBlog);
 
 // ✅ Blog Codes
-router.post("/blog-codes/generate", generateBlogCode);
-router.get("/blog-codes", getBlogCodes);
-router.delete("/blog-codes/:id", deleteBlogCode);
+// router.post("/blog-codes/generate", generateBlogCode);
+// router.get("/blog-codes", getBlogCodes);
+// router.delete("/blog-codes/:id", deleteBlogCode);
 
 // ✅ Student Projects
-router.post("/student-projects", upload.single("image"), createStudentProject);
-router.get("/student-projects", getAllStudentProjects);
-router.get("/student-projects/:slug", getStudentProjectBySlug);
-router.put("/student-projects/:id", upload.single("image"), updateStudentProject);
-router.delete("/student-projects/:id", deleteStudentProject);
-router.post("/student-projects/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentProjectForStudent);
+// router.post("/student-projects", upload.single("image"), createStudentProject);
+// router.get("/student-projects", getAllStudentProjects);
+// router.get("/student-projects/:slug", getStudentProjectBySlug);
+// router.put("/student-projects/:id", upload.single("image"), updateStudentProject);
+// router.delete("/student-projects/:id", deleteStudentProject);
+// router.post("/student-projects/student", upload.fields([{ name: "image", maxCount: 1 }, { name: "studentProfilePic", maxCount: 1 }]), createStudentProjectForStudent);
 
 // ✅ Project Codes
-router.post("/project-codes/generate", generateProjectCode);
-router.get("/project-codes", getProjectCodes);
-router.delete("/project-codes/:id", deleteProjectCode);
+// router.post("/project-codes/generate", generateProjectCode);
+// router.get("/project-codes", getProjectCodes);
+// router.delete("/project-codes/:id", deleteProjectCode);
 
 // ✅ Testimonials
 router.get("/testimonial", getAllTestimonials);
