@@ -2173,6 +2173,73 @@ exports.getAllLeadsData = async (req, res) => {
   }
 };
 
+// ✅ Get All Student Data (Normalized)
+exports.getAllStudentsData = async (req, res) => {
+  try {
+    const [enquiries, contacts, registrations] = await Promise.all([
+      Enquiry.find().sort({ createdAt: -1 }),
+      Contact.find().sort({ createdAt: -1 }),
+      Registration.find().populate("courseId").sort({ createdAt: -1 })
+    ]);
+
+    const students = [];
+
+    registrations.forEach(r => {
+      const robj = r.toObject();
+      let courseName = "Unknown";
+      if (robj.courseId && typeof robj.courseId === 'object') {
+        courseName = robj.courseId.categoryName || robj.courseId.title || "Unknown";
+      }
+      students.push({
+        name: robj.name || "",
+        email: robj.email || "",
+        phone: robj.mobile || "",
+        course: courseName,
+        source: "Registration",
+        location: robj.location || "",
+        createdAt: robj.createdAt
+      });
+    });
+
+    enquiries.forEach(e => {
+      students.push({
+        name: e.name || "",
+        email: e.email || "",
+        phone: e.mobile || "",
+        course: e.course || "Unknown",
+        source: "Enquiry",
+        location: e.location || "",
+        createdAt: e.createdAt
+      });
+    });
+
+    contacts.forEach(c => {
+      students.push({
+        name: `${c.first_name || ""} ${c.last_name || ""}`.trim(),
+        email: c.email || "",
+        phone: c.phone || "",
+        course: "Unknown",
+        source: "Contact",
+        location: "",
+        createdAt: c.createdAt
+      });
+    });
+
+    // Sort all students by date descending
+    students.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    res.status(200).json({
+      success: true,
+      count: students.length,
+      data: students
+    });
+  } catch (err) {
+    console.error("GET ALL STUDENTS DATA ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 /**
  * CREATE Student Blog
  */

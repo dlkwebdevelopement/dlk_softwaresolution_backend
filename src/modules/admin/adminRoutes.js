@@ -112,11 +112,14 @@ const {
   deleteProjectCode,
   updateImageHighlights,
   getAllLeadsData,
+  getAllStudentsData,
 } = require("./adminController");
 
 // ✅ Get All Leads (Enquiries, Contacts, Registrations) combined
 router.get("/all-leads", getAllLeadsData);
 
+// ✅ Get All Student Data (Normalized)
+router.get("/students-data", getAllStudentsData);
 // ✅ Admin Login
 router.post("/login", adminLogin);
 
