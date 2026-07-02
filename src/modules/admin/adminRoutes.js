@@ -111,7 +111,11 @@ const {
   getProjectCodes,
   deleteProjectCode,
   updateImageHighlights,
+  getAllLeadsData,
 } = require("./adminController");
+
+// ✅ Get All Leads (Enquiries, Contacts, Registrations) combined
+router.get("/all-leads", getAllLeadsData);
 
 // ✅ Admin Login
 router.post("/login", adminLogin);

@@ -1,5 +1,6 @@
 const Admin = require("../../models/admin_home/Admin");
 const Banner = require("../../models/admin_home/Banner");
+const Contact = require("../../models/admin_contact/contact");
 const CourseCategory = require("../../models/admin_courses/CourseCategory");
 const Course = require("../../models/admin_courses/Course");
 const Company = require("../../models/admin_home/Company");
@@ -2135,6 +2136,40 @@ exports.deleteProjectCode = async (req, res) => {
     res.status(200).json({ success: true, message: "Code deleted successfully" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ Get All Leads (Enquiries, Contacts, Registrations) combined
+exports.getAllLeadsData = async (req, res) => {
+  try {
+    const [enquiries, contacts, registrations] = await Promise.all([
+      Enquiry.find().sort({ createdAt: -1 }),
+      Contact.find().sort({ createdAt: -1 }),
+      Registration.find().populate("courseId").sort({ createdAt: -1 })
+    ]);
+
+    const formattedRegistrations = registrations.map(r => {
+      const robj = r.toObject();
+      let courseName = "Unknown";
+      if (robj.courseId) {
+        if (typeof robj.courseId === 'object') {
+          courseName = robj.courseId.categoryName || robj.courseId.title || "Unknown";
+        }
+      }
+      return { ...robj, courseName };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        enquiries,
+        contacts,
+        registrations: formattedRegistrations
+      }
+    });
+  } catch (err) {
+    console.error("GET ALL LEADS DATA ERROR:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
