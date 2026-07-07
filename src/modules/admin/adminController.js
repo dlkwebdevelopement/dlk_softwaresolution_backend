@@ -974,6 +974,14 @@ exports.createEnquiry = async (req, res) => {
       return res.status(400).json({ error: "Name, email, mobile and course are mandatory" });
     }
 
+    const isCurriculumRequest = inquiryType?.toLowerCase().includes("curriculum download");
+    let courseData = null;
+    if (isCurriculumRequest) {
+      courseData = await Course.findOne({ title: course });
+      if (!courseData) {
+        courseData = await CourseCategory.findOne({ categoryName: course });
+      }
+    }
 
     // 1️⃣ Save to DB
     const newEnquiry = await Enquiry.create({
@@ -991,26 +999,42 @@ exports.createEnquiry = async (req, res) => {
     const userAutoReply = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `Enquiry Received - ${inquiryType || "Course enquiry"}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
-          <h2 style="color: #3DB843;">Hello ${name},</h2>
-          <p>Thank you for your interest in our <strong>${course}</strong> course (${inquiryType || "General Enrollment"}). We have received your enquiry and our team will contact you shortly.</p>
-          <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p><strong>Sector:</strong> ${inquiryType || "Course Inquiry"}</p>
-            <p><strong>Preferred Timeslot:</strong> ${timeslot || "Not Specified"}</p>
-            <p><strong>Location:</strong> ${location || "Not Specified"}</p>
-            ${message ? `<p><strong>Your Message:</strong> ${message}</p>` : ""}
+      subject: isCurriculumRequest 
+        ? `Your Curriculum PDF - ${course}` 
+        : `Enquiry Received - ${inquiryType || "Course enquiry"}`,
+      html: isCurriculumRequest
+        ? `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #10b981;">Hello ${name},</h2>
+            <p>Thank you for your interest in our <strong>${course}</strong> course. Please find the curriculum PDF attached to this email.</p>
+            <p>Best Regards,<br/><strong>The DLK Academy Team</strong></p>
           </div>
-          <p>Best Regards,<br/><strong>DLK Support Team</strong></p>
-        </div>
-      `,
+        `
+        : `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #eee; border-radius: 10px;">
+            <h2 style="color: #3DB843;">Hello ${name},</h2>
+            <p>Thank you for your interest in our <strong>${course}</strong> course (${inquiryType || "General Enrollment"}). We have received your enquiry and our team will contact you shortly.</p>
+            <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Sector:</strong> ${inquiryType || "Course Inquiry"}</p>
+              <p><strong>Preferred Timeslot:</strong> ${timeslot || "Not Specified"}</p>
+              <p><strong>Location:</strong> ${location || "Not Specified"}</p>
+              ${message ? `<p><strong>Your Message:</strong> ${message}</p>` : ""}
+            </div>
+            <p>Best Regards,<br/><strong>DLK Support Team</strong></p>
+          </div>
+        `,
+      attachments: (isCurriculumRequest && courseData?.syllabus_pdf) ? [
+        {
+          filename: `${course.replace(/\s+/g, '_')}_Curriculum.pdf`,
+          path: courseData.syllabus_pdf
+        }
+      ] : []
     };
 
     // 📩 Admin Notification Template
     const adminTemplate = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2 style="color: #2c3e50;">📌 New Course Enquiry Received [${inquiryType || "GENERAL"}]</h2>
+        <h2 style="color: #2c3e50;">📌 New ${isCurriculumRequest ? "Curriculum Download Request" : "Course Enquiry Received"} [${inquiryType || "GENERAL"}]</h2>
         <table style="border-collapse: collapse; width: 100%; margin-top: 15px;">
           <tr><td style="padding: 8px; border: 1px solid #ddd; background: #f4f4f4;"><strong>Type</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${inquiryType || "General"}</td></tr>
           <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Name</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${name}</td></tr>
