@@ -1026,7 +1026,7 @@ exports.createEnquiry = async (req, res) => {
       attachments: (isCurriculumRequest && courseData?.syllabus_pdf) ? [
         {
           filename: `${course.replace(/\s+/g, '_')}_Curriculum.pdf`,
-          path: courseData.syllabus_pdf
+          path: courseData.syllabus_pdf.includes('/uploads/') ? require('path').join(__dirname, '../../../uploads', courseData.syllabus_pdf.split('/uploads/')[1]) : courseData.syllabus_pdf
         }
       ] : []
     };
@@ -1548,7 +1548,7 @@ exports.createRegistration = async (req, res) => {
       attachments: (isCurriculumRequest && course?.syllabus_pdf) ? [
         {
           filename: `${courseName.replace(/\s+/g, '_')}_Curriculum.pdf`,
-          path: course.syllabus_pdf
+          path: course.syllabus_pdf.includes('/uploads/') ? require('path').join(__dirname, '../../../uploads', course.syllabus_pdf.split('/uploads/')[1]) : course.syllabus_pdf
         }
       ] : []
     };

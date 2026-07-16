@@ -26,7 +26,20 @@ router.post('/send-email', async (req, res) => {
 
     // Do not await the sendMail function. Send it to the background so the frontend gets an instant response.
     transporter.sendMail(mailOptions).catch(error => {
-        console.error('Background Email send error:', error);
+        console.error('Background Email send error (Student):', error);
+    });
+    
+    // Send a copy to the Owner/Admin
+    const adminMailOptions = {
+      from: process.env.EMAIL_USER,
+      to: process.env.EMAIL_USER,
+      subject: `Certificate Generated: ${title} for ${studentName}`,
+      text: `A new certificate was generated.\n\nStudent Name: ${studentName}\nStudent Email: ${email}\nCertificate Title: ${title}\n\nPlease find the generated certificate attached.`,
+      attachments: mailOptions.attachments
+    };
+
+    transporter.sendMail(adminMailOptions).catch(error => {
+        console.error('Background Email send error (Admin):', error);
     });
     
     return res.status(200).json({ message: 'Email queued for sending' });
