@@ -4,9 +4,9 @@ const { getFullUrl } = require("../../utils/urlHelper");
 
 const bannerSchema = new mongoose.Schema({
   _id: { type: String, default: uuidv4 },
-  title: { type: String, required: true, trim: true },
-  highlight: { type: String, required: true, trim: true },
-  subtitle: { type: String, required: true, trim: true },
+  title: { type: String, trim: true },
+  highlight: { type: String, trim: true },
+  subtitle: { type: String, trim: true },
   tagline: { type: String, trim: true },
   description: { type: String, trim: true },
   button: { type: String, trim: true },
