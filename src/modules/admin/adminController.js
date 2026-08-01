@@ -1097,9 +1097,10 @@ exports.uploadBanner = async (req, res) => {
       req.body;
 
     // ✅ Basic validation
-    if (!title || !highlight || !subtitle) {
+    const contentActive = req.body.isContentActive === 'true' || req.body.isContentActive === true;
+    if (contentActive && (!title || !highlight || !subtitle)) {
       return res.status(400).json({
-        message: "Title, highlight, and subtitle are required",
+        message: "Title, highlight, and subtitle are required when content is active",
       });
     }
 
@@ -3199,9 +3200,10 @@ exports.uploadBanner = async (req, res) => {
 
     const { title, highlight, subtitle, tagline, description, button } = req.body;
 
-    if (!title || !highlight || !subtitle) {
+    const contentActive = req.body.isContentActive === 'true' || req.body.isContentActive === true;
+    if (contentActive && (!title || !highlight || !subtitle)) {
       return res.status(400).json({
-        message: "Title, highlight, and subtitle are required",
+        message: "Title, highlight, and subtitle are required when content is active",
       });
     }
 
@@ -3443,9 +3445,10 @@ exports.uploadBanner = async (req, res) => {
 
     const { title, highlight, subtitle, tagline, description, button, isContentActive } = req.body;
 
-    if (!title || !highlight || !subtitle) {
+    const contentActive = req.body.isContentActive === 'true' || req.body.isContentActive === true;
+    if (contentActive && (!title || !highlight || !subtitle)) {
       return res.status(400).json({
-        message: "Title, highlight, and subtitle are required",
+        message: "Title, highlight, and subtitle are required when content is active",
       });
     }
 
