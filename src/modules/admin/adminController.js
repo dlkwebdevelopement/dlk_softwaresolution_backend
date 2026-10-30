@@ -120,10 +120,15 @@ exports.createCategory = async (req, res) => {
 ========================= */
 exports.getCategories = async (req, res) => {
   try {
-    const data = await CourseCategory.aggregate([
+    const { scope } = req.query;
+    const pipeline = [];
+    if (scope) {
+      pipeline.push({ $match: { scope } });
+    }
+    pipeline.push(
       {
         $lookup: {
-          from: "courses", // The name of the collection in MongoDB (usually lowercase plural)
+          from: "courses",
           localField: "_id",
           foreignField: "category_id",
           as: "courses"
@@ -132,18 +137,20 @@ exports.getCategories = async (req, res) => {
       {
         $addFields: {
           courseCount: { $size: "$courses" },
-          id: "$_id" // Add 'id' field to match Mongoose virtuals behavior
+          id: "$_id"
         }
       },
       {
         $project: {
-          courses: 0 // Remove the full courses array to save bandwidth
+          courses: 0
         }
       },
       {
         $sort: { updatedAt: -1 }
       }
-    ]);
+    );
+
+    const data = await CourseCategory.aggregate(pipeline);
     res.status(200).json(data);
   } catch (err) {
     console.error("GET ALL CATEGORIES ERROR:", err);
@@ -902,8 +909,8 @@ exports.deleteCategory = async (req, res) => {
 ========================= */
 exports.getCategoriesWithSubs = async (req, res) => {
   try {
-    // Fetch all categories
-    const categories = await CourseCategory.find();
+    // Fetch course categories (exclude internship scope)
+    const categories = await CourseCategory.find({ scope: { $ne: "internship" } });
 
     // Fetch all courses
     const courses = await Course.find({}, "title slug category_id");
