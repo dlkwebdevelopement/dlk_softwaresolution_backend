@@ -913,7 +913,7 @@ exports.getCategoriesWithSubs = async (req, res) => {
     const categories = await CourseCategory.find({ scope: { $ne: "internship" } });
 
     // Fetch all courses
-    const courses = await Course.find({}, "title slug category_id");
+    const courses = await Course.find({}, "title slug category_id duration").sort({ createdAt: 1 });
 
     // Nest courses under their categories (acting as subcategories)
     const result = categories.map((cat) => {
@@ -926,7 +926,9 @@ exports.getCategoriesWithSubs = async (req, res) => {
           .map((course) => ({
             id: course._id,
             subcategory: course.title, // Treat course title as subcategory name
-            slug: course.slug,
+            title: course.title,
+              slug: course.slug,
+              duration: course.duration,
           })),
       };
     });

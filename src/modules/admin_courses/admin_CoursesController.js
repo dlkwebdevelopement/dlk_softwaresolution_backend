@@ -421,8 +421,7 @@ exports.getCoursesByCategory = async (req, res) => {
     const { categoryId } = req.params;
     const baseUrl = `${req.protocol}://${req.get("host")}`;
 
-    const courses = await Course.find({ category_id: categoryId })
-      .sort({ createdAt: -1 });
+    const courses = await Course.find({ category_id: categoryId }).sort({ createdAt: 1 });
 
     const formattedCourses = courses.map((course) => {
       const c = course.toObject();
