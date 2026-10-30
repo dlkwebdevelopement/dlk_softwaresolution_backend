@@ -2266,6 +2266,58 @@ exports.getAllStudentsData = async (req, res) => {
 
 
 /**
+ * VERIFY Student Blog Code
+ */
+exports.verifyBlogCode = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: "Code is required" });
+    }
+    const codeDoc = await BlogCode.findOne({ code, isUsed: false });
+    if (!codeDoc) {
+      return res.status(400).json({ success: false, message: "Invalid or already used code" });
+    }
+    const now = new Date();
+    const codeDate = new Date(codeDoc.createdAt);
+    const diffHours = (now - codeDate) / (1000 * 60 * 60);
+    if (diffHours > 24) {
+      return res.status(400).json({ success: false, message: "This code has expired (valid only for 24 hours)" });
+    }
+    res.status(200).json({ success: true, message: "Code is valid" });
+  } catch (error) {
+    console.error("Verify Blog Code Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * VERIFY Student Project Code
+ */
+exports.verifyProjectCode = async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, message: "Code is required" });
+    }
+    const codeDoc = await ProjectCode.findOne({ code, isUsed: false });
+    if (!codeDoc) {
+      return res.status(400).json({ success: false, message: "Invalid or already used project code" });
+    }
+    const now = new Date();
+    const codeDate = new Date(codeDoc.createdAt);
+    const diffHours = (now - codeDate) / (1000 * 60 * 60);
+    if (diffHours > 24) {
+      return res.status(400).json({ success: false, message: "This code has expired (valid only for 24 hours)" });
+    }
+    res.status(200).json({ success: true, message: "Code is valid" });
+  } catch (error) {
+    console.error("Verify Project Code Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * CREATE Student Blog
  */
 exports.createStudentBlog = async (req, res) => {

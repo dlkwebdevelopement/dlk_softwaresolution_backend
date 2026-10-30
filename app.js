@@ -50,6 +50,10 @@ app.use("/admin", adminCourse);
 const adminContact = require("./src/modules/admin_contact/ContactRoutes");
 app.use("/admin", adminContact);
 
+// ✅ Internship Module Routes
+const internshipRoutes = require("./src/modules/internships/internshipRoutes");
+app.use("/admin", internshipRoutes);
+
 // ✅ Certificate Route
 const certificateRoutes = require("./src/modules/certificates/certificateRoutes");
 app.use("/certificates", certificateRoutes);
