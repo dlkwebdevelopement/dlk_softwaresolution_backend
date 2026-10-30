@@ -22,6 +22,7 @@ const OfficeGallery = require("../../models/admin_home/OfficeGallery");
 
 const slugify = require("slugify");
 const sanitizeHtml = require("sanitize-html");
+const bcrypt = require("bcrypt");
 const Testimonial = require("../../models/admin_home/Testimonials");
 const transporter = require("../../utils/mailsender");
 const mongoose = require("mongoose");
@@ -32,14 +33,52 @@ const Workshop = require("../../models/admin_home/Workshop");
 const { getFullUrl } = require("../../utils/urlHelper");
 const { getIO } = require("../../utils/socket");
 
-// ✅ Admin login
+// ✅ Admin login (with bcrypt support and auto-upgrade of plaintext passwords)
 exports.adminLogin = async (req, res) => {
   const { username, password } = req.body;
 
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
+
   try {
-    const admin = await Admin.findOne({ username, password });
+    const admin = await Admin.findOne({ username: username.trim().toLowerCase() });
     if (!admin) return res.status(401).json({ message: "Invalid credentials" });
-    res.status(200).json({ message: "Login successful", admin });
+
+    let isMatch = false;
+    const isBcryptHash = typeof admin.password === "string" && admin.password.startsWith("$2");
+
+    if (isBcryptHash) {
+      isMatch = await bcrypt.compare(password, admin.password);
+    } else {
+      // Legacy plaintext password check
+      if (admin.password === password) {
+        isMatch = true;
+        // Seamlessly auto-upgrade to bcrypt hash in DB
+        try {
+          const hashedPassword = await bcrypt.hash(password, 10);
+          admin.password = hashedPassword;
+          await admin.save();
+        } catch (hashErr) {
+          console.error("Auto-hash error on login:", hashErr);
+        }
+      }
+    }
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Return admin details without the password hash
+    const adminData = {
+      id: admin.id || admin._id,
+      _id: admin._id,
+      username: admin.username,
+      email: admin.email || "",
+      createdAt: admin.createdAt,
+    };
+
+    res.status(200).json({ message: "Login successful", admin: adminData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

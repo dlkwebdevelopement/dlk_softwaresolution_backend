@@ -79,7 +79,7 @@ app.use((err, req, res, next) => {
 });
 
 // ✅ Start server
-const PORT = process.env.NODE_ENV === "production" ? 6000 : 5000;
+const PORT = process.env.PORT || (process.env.NODE_ENV === "production" ? 6000 : 5000);
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port http://localhost:${PORT}`);
 });
