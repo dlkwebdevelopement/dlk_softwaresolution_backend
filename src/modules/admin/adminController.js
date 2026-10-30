@@ -89,7 +89,7 @@ exports.adminLogin = async (req, res) => {
 ========================= */
 exports.createCategory = async (req, res) => {
   try {
-    const { categoryName, description } = req.body;
+    const { categoryName, description, scope } = req.body;
 
     if (!categoryName) {
       return res.status(400).json({ message: "Category name is required" });
@@ -100,7 +100,8 @@ exports.createCategory = async (req, res) => {
     const data = await CourseCategory.create({
       categoryName,
       slug,
-      description: description || null,
+      description: description || scope || "course",
+      scope: scope || description || "course",
       image: req.file ? getFullUrl(`uploads/${req.file.filename}`) : null,
     });
 
@@ -827,7 +828,7 @@ exports.deleteOfficeGalleryImage = async (req, res) => {
 exports.updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    const { categoryName, description } = req.body;
+    const { categoryName, description, scope } = req.body;
 
     const existing = await CourseCategory.findById(id);
 
@@ -846,7 +847,8 @@ exports.updateCategory = async (req, res) => {
 
     const updateData = {
       categoryName: categoryName ?? existing.categoryName,
-      description: description ?? existing.description,
+      description: description ?? scope ?? existing.description,
+      scope: scope ?? description ?? existing.scope ?? "course",
       image,
     };
 

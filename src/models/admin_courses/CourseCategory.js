@@ -8,6 +8,7 @@ const courseCategorySchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true, trim: true },
   image: { type: String, trim: true, get: getFullUrl },
   description: { type: String, trim: true },
+  scope: { type: String, trim: true, default: "course" },
 }, { 
   timestamps: true,
   toJSON: { virtuals: true, getters: true },
