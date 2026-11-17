@@ -95,7 +95,16 @@ exports.createCategory = async (req, res) => {
       return res.status(400).json({ message: "Category name is required" });
     }
 
-    const slug = slugify(categoryName, { lower: true, strict: true });
+    let baseSlug = slugify(categoryName, { lower: true, strict: true });
+    let slug = baseSlug;
+    const existingSlug = await CourseCategory.findOne({ slug });
+    if (existingSlug) {
+      slug = `${baseSlug}-${scope || description || "item"}`;
+      const secondCheck = await CourseCategory.findOne({ slug });
+      if (secondCheck) {
+        slug = `${baseSlug}-${Date.now()}`;
+      }
+    }
 
     const data = await CourseCategory.create({
       categoryName,
@@ -860,7 +869,13 @@ exports.updateCategory = async (req, res) => {
     };
 
     if (categoryName) {
-      updateData.slug = slugify(categoryName, { lower: true, strict: true });
+      let baseSlug = slugify(categoryName, { lower: true, strict: true });
+      let slug = baseSlug;
+      const slugMatch = await CourseCategory.findOne({ slug, _id: { $ne: id } });
+      if (slugMatch) {
+        slug = `${baseSlug}-${updateData.scope || "item"}`;
+      }
+      updateData.slug = slug;
     }
 
     const updated = await CourseCategory.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
